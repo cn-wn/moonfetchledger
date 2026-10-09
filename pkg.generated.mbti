@@ -1,0 +1,89 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "cn-wn/moonfetchledger"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub fn digest(Bytes) -> String
+
+pub fn restore(String, ObjectSpec) -> Session raise LedgerError
+
+// Errors
+pub suberror LedgerError {
+  InvalidSpec(String)
+  InvalidCheckpoint(String)
+  StaleLease
+  InvalidResponse(String)
+  ReadbackMismatch(Int64)
+  RecoveryRequired
+  Incomplete(Int64)
+  DigestMismatch(String)
+} derive(@debug.Debug)
+pub fn LedgerError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub(all) struct ByteRange {
+  start : Int64
+  end : Int64
+} derive(Eq, @debug.Debug)
+pub fn ByteRange::equal(Self, Self) -> Bool
+pub fn ByteRange::length(Self) -> Int64
+pub fn ByteRange::not_equal(Self, Self) -> Bool
+pub fn ByteRange::to_repr(Self) -> @debug.Repr
+
+pub struct Lease {
+  range : ByteRange
+  // private fields
+}
+
+pub struct ObjectSpec {
+  resource : String
+  length : Int64
+  etag : String
+  sha256 : String
+} derive(Eq, @debug.Debug)
+pub fn ObjectSpec::equal(Self, Self) -> Bool
+pub fn ObjectSpec::new(String, Int64, String, String) -> Self raise LedgerError
+pub fn ObjectSpec::not_equal(Self, Self) -> Bool
+pub fn ObjectSpec::to_repr(Self) -> @debug.Repr
+
+pub struct PreparedChunk {
+  // private fields
+}
+
+pub(all) struct RecoveryReport {
+  retained_bytes : Int64
+  invalidated : Array[ByteRange]
+} derive(@debug.Debug)
+pub fn RecoveryReport::to_repr(Self) -> @debug.Repr
+
+pub struct Session {
+  spec : ObjectSpec
+  chunk_size : Int
+  // private fields
+}
+pub fn Session::checkpoint(Self) -> String raise LedgerError
+pub fn Session::commit_written(Self, PreparedChunk, Bytes) -> Unit raise LedgerError
+pub fn Session::confirmed_bytes(Self) -> Int64
+pub fn Session::finish_recovery(Self) -> Unit raise LedgerError
+pub fn Session::new(ObjectSpec, chunk_size? : Int) -> Self raise LedgerError
+pub fn Session::prepare_chunk(Self, Lease, Bytes, status~ : Int, etag~ : String, range~ : ByteRange, total~ : Int64, content_encoding? : String) -> PreparedChunk raise LedgerError
+pub fn Session::reconcile_block(Self, ByteRange, Bytes?) -> Bool raise LedgerError
+pub fn Session::recovery_ranges(Self) -> Array[ByteRange]
+pub fn Session::release(Self, Lease) -> Unit raise LedgerError
+pub fn Session::reserve_missing(Self) -> Lease? raise LedgerError
+pub fn Session::verifier(Self) -> Verifier raise LedgerError
+pub fn Session::verify_complete(Self, (ByteRange) -> Bytes raise) -> Unit raise
+
+pub struct Verifier {
+  // private fields
+}
+pub fn Verifier::finish(Self) -> Unit raise LedgerError
+pub fn Verifier::next_range(Self) -> ByteRange?
+pub fn Verifier::push(Self, Bytes) -> Unit raise LedgerError
+
+// Type aliases
+
+// Traits

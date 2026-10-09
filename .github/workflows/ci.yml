@@ -1,0 +1,41 @@
+name: Verify
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-2022]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install stable MoonBit (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Install stable MoonBit (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          irm https://cli.moonbitlang.com/install/powershell.ps1 | iex
+          Add-Content -LiteralPath $env:GITHUB_PATH -Value "$env:USERPROFILE\.moon\bin"
+      - name: Record toolchain
+        run: moon version --all
+      - name: Verify (Unix)
+        if: runner.os != 'Windows'
+        run: moon run scripts/verify.mbtx
+      - name: Verify (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        env:
+          MOON_CC: cl
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          moon run scripts/verify.mbtx

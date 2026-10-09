@@ -1,0 +1,10 @@
+import {
+  "cn-wn/moonfetchledger" @ledger,
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/core/env",
+}
+
+pkgtype(kind: "executable")
+
+supported_targets = "wasm+native"
