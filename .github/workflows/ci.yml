@@ -4,6 +4,7 @@ permissions:
   contents: read
 jobs:
   verify:
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
@@ -28,6 +29,8 @@ jobs:
           Add-Content -LiteralPath $env:GITHUB_PATH -Value "$env:USERPROFILE\.moon\bin"
       - name: Record toolchain
         run: moon version --all
+      - name: Initialize public package registry
+        run: moon update
       - name: Verify (Unix)
         if: runner.os != 'Windows'
         run: moon run scripts/verify.mbtx

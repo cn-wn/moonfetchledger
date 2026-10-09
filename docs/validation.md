@@ -13,9 +13,15 @@ https://cli.moonbitlang.com/binaries/latest/moonbit-windows-x86_64.sha256 .
 The isolated Linux toolchain reports the same compiler/build-tool versions.
 
 - Windows: strict core tests on wasm, wasm-gc and js.
-- Ubuntu/WSL, GCC 12.5: actual native core tests and actual native assembly example.
+- Ubuntu/WSL, GCC 12.5: actual native tests and actual native assembly example.
 - 14 tests per target, including the checked README. Generated property cases cover
   129 binary sizes x 4 block sizes (516 complete reception/recovery round trips).
+- Native host adds response-range validation, preservation of unrelated/extra
+  data, exclusive-lock/reopen and checkpoint preservation tests (18 total on native).
+- Offline actual HTTP/disk workflow passed on Linux: reverse arrival order,
+  separate paused/resumed processes, 8192 retained bytes, one invalidated block,
+  exactly five repair requests, full-byte equality, no requests on complete reopen,
+  rejected changed ETag and successful subsequent retry.
 - Truncated checkpoints, malformed/unknown data, cancellation, foreign leases,
   rejected responses, failed readback, missing/corrupt blocks and final digests.
 - Real data assembly: 28008 bytes, one invalidated block, final SHA-256
@@ -27,14 +33,21 @@ MinGW is not a supported substitute. CI uses the Windows-2022 MSVC environment,
 plus Linux and macOS. CI status must be checked after pushing; configuration alone
 is not evidence of success.
 
-An upstream async C stub produced GCC's ignored-return-value warning; project
+Upstream async C stubs produced GCC's ignored-return-value warning and MSVC's
+EINVAL macro-redefinition warning; project
 MoonBit code is checked with `--deny-warn`. No dependency code was modified.
 
 Reproduce in a shell with moon, node and the platform C compiler on PATH:
 
 ```text
+moon update
 moon run scripts/verify.mbtx
 ```
 
 That script checks formatting/interface drift, strict checks, actual four-target
-tests and the wasm/native real-data assembly example. Automation is MoonBit `.mbtx`.
+tests, the wasm/native real-data assembly example and the offline HTTP/disk workflow
+described in `recovery-demo.md`. Automation is MoonBit `.mbtx`, with dependency
+versions pinned independently in the script import headers.
+The fixture server shuts down through a finite accept loop and an explicit stop
+request, including on Windows. Verification commands have three-minute budgets;
+CI jobs have a ten-minute ceiling and print each stage before starting it.

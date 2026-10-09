@@ -1,0 +1,148 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/http",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/async@0.21.3/socket",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string" @strconv,
+}
+
+///|
+async fn invoke(
+  url : String,
+  path : String,
+  extra : Array[String],
+) -> @shell.Output {
+  let args = [
+    "run", "--target", "native", "cmd/fetch", "--", "--url", url, "--output", path,
+    "--length", "28008", "--etag", "\"fixture-v1\"", "--sha256", "dca55780e807e6b6dc5dafe53a621bf99929681551ab85bb4a27f5142e208042",
+    "--chunk-size", "4096",
+  ]
+  args.append(extra)
+  @shell.Cmd("moon", args).output(timeout_ms=120000)
+}
+
+///|
+async fn main {
+  let data = @fs.read_file("fixtures/earthquakes-2024-01-01.csv").binary()
+  assert_eq(data.length(), 28008)
+  let dir = @fs.tmpdir(prefix="moonfetchledger-e2e-")
+  defer @fs.rmdir(dir, recursive=true)
+  let requested : Array[Int] = []
+  let completed : Array[Int] = []
+  let mut reject_once = true
+  let mut reverse_first = true
+  @async.with_task_group(group => {
+    let server = @http.Server::Server(@socket.Addr::parse("127.0.0.1:0"))
+    defer server.close()
+    let url = "http://127.0.0.1:\{server.addr.port()}"
+    let serving = group.spawn(() => {
+      while true {
+        let (conn, _) = server.accept()
+        let request = conn.read_request()
+        if request.path == "/__stop" {
+          conn.send_response(200, "OK", extra_headers={ "Connection": "close" })
+          conn.end_response()
+          conn.close()
+          break
+        }
+        group.spawn_bg(allow_failure=true, () => {
+          defer conn.close()
+          let header = request.headers.get("Range").unwrap_or("")
+          assert_true(header.has_prefix("bytes="))
+          assert_eq(request.headers.get("If-Range"), Some("\"fixture-v1\""))
+          assert_eq(request.headers.get("Accept-Encoding"), Some("identity"))
+          let bounds = header[6:].split("-").collect()
+          assert_eq(bounds.length(), 2)
+          let start = @strconv.parse_int(bounds[0])
+          let end = @strconv.parse_int(bounds[1]) + 1
+          assert_true(start >= 0 && end <= data.length() && end > start)
+          let index = start / 4096
+          requested.push(index)
+          let bad = request.path == "/retry" && reject_once
+          if bad {
+            reject_once = false
+          }
+          // Gate completion order rather than assuming scheduler/network timing.
+          if reverse_first && index < 2 {
+            while !completed.contains(index + 1) {
+              @async.sleep(1)
+            }
+          }
+          conn.send_response(206, "Partial Content", extra_headers={
+            "ETag": if bad {
+              "\"changed\""
+            } else {
+              "\"fixture-v1\""
+            },
+            "Content-Range": "bytes \{start}-\{end - 1}/\{data.length()}",
+            "Connection": "close",
+          })
+          conn.write(data[start:end].to_owned())
+          conn.end_response()
+          completed.push(index)
+        })
+      }
+    })
+    let path = dir + "/earthquakes.csv"
+    let first = invoke(url + "/data", path, ["--stop-after-blocks", "3"])
+    first.check()
+    reverse_first = false
+    assert_true(first.stdout().contains("paused: confirmed=12288 fetched=3"))
+    assert_eq(requested.length(), 3)
+    assert_eq(completed[0], 2)
+    let before = @fs.read_file(path + ".mfl").text()
+    match @json.parse(before) {
+      [_, _, _, _, _, _, Array(records)] => assert_eq(records.length(), 3)
+      _ => fail("invalid CLI checkpoint")
+    }
+    let corrupt = @fs.open(path, mode=ReadWrite)
+    corrupt.write_at(b"\x00", position=3L)
+    corrupt.sync()
+    corrupt.close()
+    requested.clear()
+    completed.clear()
+    let second = invoke(url + "/data", path, [])
+    second.check()
+    assert_true(
+      second
+      .stdout()
+      .contains(
+        "complete: confirmed=28008 fetched=5 retained=8192 invalidated=1",
+      ),
+    )
+    assert_eq(requested.length(), 5)
+    assert_true(
+      requested.contains(0) && !requested.contains(1) && !requested.contains(2),
+    )
+    assert_eq(@fs.read_file(path).binary(), data)
+    let checkpoint = @fs.read_file(path + ".mfl").text()
+    requested.clear()
+    let third = invoke(url + "/data", path, [])
+    third.check()
+    assert_eq(requested.length(), 0)
+    assert_eq(@fs.read_file(path + ".mfl").text(), checkpoint)
+    let retry_path = dir + "/retry.csv"
+    let refused = invoke(url + "/retry", retry_path, ["--parallel", "1"])
+    assert_true(refused.exit_code() != 0)
+    assert_true(
+      (refused.stdout() + refused.stderr()).contains(
+        "ETag, range, length or encoding",
+      ),
+    )
+    assert_eq(@fs.file_size(retry_path), 0L)
+    let retry = invoke(url + "/retry", retry_path, ["--parallel", "1"])
+    retry.check()
+    assert_eq(@fs.read_file(retry_path).binary(), data)
+    let (stopped, _) = @http.get(url + "/__stop")
+    assert_eq(stopped.code, 200)
+    serving.wait()
+    println(first.stdout().trim())
+    println(second.stdout().trim())
+    println(
+      "offline HTTP/disk recovery verified: reverse arrivals, independent processes, selective refill, stable checkpoint, bad-response refusal and retry",
+    )
+  })
+}

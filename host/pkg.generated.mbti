@@ -1,0 +1,32 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "cn-wn/moonfetchledger/host"
+
+import {
+  "cn-wn/moonfetchledger",
+  "moonbitlang/core/debug",
+}
+
+// Values
+pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int) -> DownloadReport
+
+// Errors
+pub suberror HostError {
+  InvalidInput(String)
+  InvalidResponse(String)
+  CheckpointTooLarge
+  OutputLocked
+} derive(@debug.Debug)
+pub fn HostError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct DownloadReport {
+  complete : Bool
+  confirmed_bytes : Int64
+  downloaded_blocks : Int
+  recovery : @moonfetchledger.RecoveryReport
+} derive(@debug.Debug)
+pub fn DownloadReport::to_repr(Self) -> @debug.Repr
+
+// Type aliases
+
+// Traits

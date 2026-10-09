@@ -1,0 +1,11 @@
+import {
+  "cn-wn/moonfetchledger" @ledger,
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/http",
+  "moonbitlang/core/string" @strconv,
+}
+
+options(
+  supported_targets: "native",
+)

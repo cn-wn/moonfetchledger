@@ -14,6 +14,8 @@ fixed-block coverage rather than trusting file length or a downloaded-byte count
 - Bounded-memory whole-file verification, including asynchronous adapter support.
 - Blocks of 1..4194304 bytes, at most 100000 blocks, short final blocks and empty
   objects. Int64 offsets never pass through floating-point serialization.
+- Native HTTP/filesystem adapter and generic CLI: cooperative file lock, bounded
+  parallel requests, synced write/readback, replace-on-save checkpoints and repair.
 
 Core targets: wasm, wasm-gc, JavaScript and native. Host and actual validation
 boundaries are recorded in `docs/validation.md`.
@@ -23,7 +25,8 @@ boundaries are recorded in `docs/validation.md`.
 Install the stable toolchain: https://www.moonbitlang.com/download/ .
 
 ```text
-moon run examples/assemble
+moon update
+moon run --target wasm examples/assemble
 moon test --target wasm --deny-warn
 moon test --target wasm-gc --deny-warn
 moon test --target js --deny-warn
@@ -32,8 +35,20 @@ moon test --target native --deny-warn
 
 The example reads a real USGS snapshot, reserves blocks, assembles in reverse
 order, restores a checkpoint, damages a block, detects/refills it and verifies
-the entire SHA-256. Use `moon run examples/assemble -- --input PATH` for another file. Storage is in memory;
+the entire SHA-256. Use `moon run --target wasm examples/assemble -- --input PATH` for another file. Storage is in memory;
 the example runs on wasm/native and does not claim HTTP or durable disk recovery.
+
+For real HTTP and disk recovery with independent downloader processes:
+
+```text
+moon run scripts/recovery_demo.mbtx
+moon run --target native cmd/fetch -- --help
+```
+
+The offline demo serves the bundled data, pauses, damages a confirmed disk block,
+retains correct blocks, refetches only missing/damaged blocks and verifies all
+final bytes. It also tests bad-response refusal and successful retry. See
+[the end-to-end workflow](docs/recovery-demo.md) for commands and exact boundaries.
 
 ## Integration contract
 
@@ -77,7 +92,7 @@ This is a complementary receive/storage-state layer, not a replacement HTTP stac
 model hub, tus upload protocol or content-deduplication engine. We make no claim
 of ecosystem uniqueness or performance superiority. API review: `docs/ecosystem.md`.
 
-Next capability: actual HTTP/disk adapter and offline end-to-end recovery demo.
-Later: backpressure and integrations driven by downstream needs. These are planned.
+Planned: retry/backoff, authenticated manifest integration and a browser storage
+adapter, driven by downstream needs. [Design and roadmap](docs/design.md).
 
 Apache-2.0. Data/dependency sources: `THIRD_PARTY_NOTICES.md`.

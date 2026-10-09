@@ -21,7 +21,7 @@ license = "Apache-2.0"
 
 keywords = [ "download", "range", "recovery", "storage", "ledger" ]
 
-preferred_target = "wasm"
+preferred_target = "native"
 
 description = "Sparse HTTP download reception and verified storage recovery ledger."
 

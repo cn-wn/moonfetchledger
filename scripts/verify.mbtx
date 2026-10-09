@@ -1,30 +1,53 @@
+///|
 import {
-  "moonbitlang/async",
-  "moonbitlang/async/fs",
-  "moonbitlang/async/shell",
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/shell",
 }
 
+///|
+async fn checked(args : Array[String]) -> Unit {
+  println("verify: \{Repr(args)}")
+  @shell.Cmd("moon", args).run(timeout_ms=180000)
+}
+
+///|
 async fn main {
-  let inventory = @shell.Cmd("git", ["ls-files", "--cached", "--others", "--exclude-standard"]).output()
+  let inventory = @shell.Cmd("git", [
+    "ls-files", "--cached", "--others", "--exclude-standard",
+  ]).output()
   inventory.check()
   let before : Map[String, String] = Map([])
   for path in inventory.stdout().split("\n") {
     let path = path.trim().to_owned()
-    if path.has_suffix(".mbt") || path.has_suffix(".mbti") || path.has_suffix(".mbt.md") ||
-      path == "moon.mod" || path.has_suffix("moon.pkg") {
+    if path.has_suffix(".mbt") ||
+      path.has_suffix(".mbtx") ||
+      path.has_suffix(".mbti") ||
+      path.has_suffix(".mbt.md") ||
+      path == "moon.mod" ||
+      path.has_suffix("moon.pkg") {
       before[path] = @fs.read_file(path).text()
     }
   }
-  @shell.Cmd("moon", ["fmt"]).run()
-  @shell.Cmd("moon", ["info"]).run()
+  checked(["fmt"])
+  checked([
+    "fmt", "--check", "scripts/verify.mbtx", "scripts/recovery_demo.mbtx",
+  ])
+  checked(["info"])
+  checked(["info", "--target", "native"])
   for path, content in before {
-    if @fs.read_file(path).text() != content { fail("format/interface drift: \{path}") }
+    if @fs.read_file(path).text() != content {
+      fail("format/interface drift: \{path}")
+    }
   }
-  @shell.Cmd("moon", ["check", "--target", "all", "--deny-warn"]).run()
+  checked(["check", "--target", "all", "--deny-warn"])
   for target in ["wasm", "wasm-gc", "js", "native"] {
-    @shell.Cmd("moon", ["test", "--target", target, "--deny-warn"]).run()
+    checked(["test", "--target", target, "--deny-warn"])
   }
-  @shell.Cmd("moon", ["run", "--target", "wasm", "examples/assemble"]).run()
-  @shell.Cmd("moon", ["run", "--target", "native", "examples/assemble"]).run()
-  println("verified formatting, interfaces, four core targets and real-data assembly")
+  checked(["run", "--target", "wasm", "examples/assemble"])
+  checked(["run", "--target", "native", "examples/assemble"])
+  checked(["run", "scripts/recovery_demo.mbtx"])
+  println(
+    "verified formatting, interfaces, four core targets, real-data assembly and HTTP/disk recovery",
+  )
 }
