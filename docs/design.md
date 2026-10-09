@@ -87,7 +87,9 @@ the demo serves the bundled public-domain USGS snapshot over loopback.
 - Implemented: serialized download progress and callback-error restart behavior.
 - Implemented: cooperative pause intent, draining current batches and resuming
   saved coverage, with completion taking precedence and errors still propagating.
-- Planned: authenticated release-manifest integrations.
+- Implemented: transient resource-bound Bearer authentication, environment-only
+  CLI credential input, rotation/resume, immediate 401/403 refusal and no redirects.
+- Planned: authenticated release-manifest integrations beyond transport credentials.
 - Planned: independent browser storage adapter with the same receive contract;
   versioned checkpoint migrations only when a concrete schema extension is needed.
 

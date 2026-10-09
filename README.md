@@ -30,6 +30,8 @@ fixed-block coverage rather than trusting file length or a downloaded-byte count
   completion events and opt-in deterministic CLI JSON lines.
 - Cooperative pause intent: drain the current batch, save it, return resumable
   incomplete coverage and resume with a fresh signal without refetching valid blocks.
+- Transient resource-bound Bearer credentials for private artifacts, environment
+  input in the CLI and credential rotation without changing recovery identity.
 
 Core targets: wasm, wasm-gc, JavaScript and native. Host and actual validation
 boundaries are recorded in `docs/validation.md`.
@@ -77,6 +79,8 @@ Use [download progress](docs/progress.md) via `on_progress` or CLI `--progress`
 to observe saved blocks, pauses and verified completion.
 Use [controlled pause](docs/pause.md) for application-driven pause/resume;
 `moon run --target native examples/controlled` demonstrates it with real data.
+Use [authenticated download](docs/auth.md) with `--bearer-env VARIABLE_NAME`;
+`moon run scripts/auth_demo.mbtx` verifies credential rotation and recovery offline.
 
 ## Integration contract
 

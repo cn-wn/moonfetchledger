@@ -11,6 +11,9 @@ No implementation was copied from the comparison projects.
 - Protocol reference: https://www.rfc-editor.org/rfc/rfc9110.html , sections
   8.8, 10.2.3, 13.1.5, 14; 429 semantics:
   https://www.rfc-editor.org/rfc/rfc6585.html#section-4 . No RFC prose or code was copied.
+- Bearer header syntax/transport reference:
+  https://www.rfc-editor.org/rfc/rfc6750#section-2.1 . No RFC prose/code copied;
+  token validation, binding and workflow tests are project-authored Apache-2.0.
 - Standard SHA-256 empty/abc test vectors:
   https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program/secure-hashing .
   Other binary test cases are project-authored deterministic data.

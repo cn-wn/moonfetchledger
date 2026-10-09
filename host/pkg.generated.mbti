@@ -11,7 +11,7 @@ pub async fn adopt(@moonfetchledger.ObjectSpec, String, chunk_size? : Int) -> Un
 
 pub async fn audit(@moonfetchledger.ObjectSpec, String) -> AuditReport
 
-pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int, max_attempts? : Int, retry_delay_ms? : Int, request_timeout_ms? : Int, on_progress? : async (DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> DownloadReport
+pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int, max_attempts? : Int, retry_delay_ms? : Int, request_timeout_ms? : Int, on_progress? : async (DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal, auth? : BearerAuth) -> DownloadReport
 
 pub async fn export_verified(@moonfetchledger.ObjectSpec, String, String) -> Unit
 
@@ -38,6 +38,11 @@ pub struct AuditReport {
 } derive(@debug.Debug)
 pub fn AuditReport::to_json(Self) -> Json
 pub fn AuditReport::to_repr(Self) -> @debug.Repr
+
+pub struct BearerAuth {
+  // private fields
+}
+pub fn BearerAuth::new(String, String, allow_loopback_http? : Bool) -> Self raise HostError
 
 pub enum DownloadPhase {
   Recovered

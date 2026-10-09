@@ -80,15 +80,26 @@ async fn fetch_once(
   lease : @ledger.Lease,
   timeout : Int,
   delay : Int,
+  auth : BearerAuth?,
 ) -> FetchResult {
   @async.with_timeout(timeout, () => {
     let requested = lease.range
-    let (response, client) = @http.get_stream(spec.resource, headers={
+    let headers : @http.Headers = {
       "Range": "bytes=\{requested.start}-\{requested.end - 1L}",
       "If-Range": spec.etag,
       "Accept-Encoding": "identity",
-    })
+    }
+    if auth is Some(credential) {
+      credential.check_resource(spec.resource)
+      headers["Authorization"] = "Bearer " + credential.token
+    }
+    let (response, client) = @http.get_stream(spec.resource, headers~)
     defer client.close()
+    if auth is Some(_) && (response.code == 401 || response.code == 403) {
+      raise InvalidResponse(
+        "HTTP \{response.code}: authentication refused; obtain a fresh credential and resume the retained session",
+      )
+    }
     if response.code == 429 || response.code == 503 {
       return Retry(
         "HTTP \{response.code}",
@@ -122,7 +133,18 @@ async fn fetch_once(
     Payload(bytes)
   }) catch {
     @async.TimeoutError => Retry("request timeout", delay)
-    other => raise other
+    InvalidResponse(_) as error => raise error
+    InvalidInput(_) as error => raise error
+    other => {
+      if auth is Some(_) && !@async.is_cancellation_error(other) {
+        // Do not expose untrusted parser/transport diagnostics that could reflect
+        // a credential. Known adapter diagnostics above contain no input values.
+        raise InvalidResponse(
+          "authenticated HTTP I/O failed; check TLS/network and resume with valid credentials",
+        )
+      }
+      raise other
+    }
   }
 }
 
@@ -135,9 +157,10 @@ async fn fetch(
   attempts : Int,
   delay : Int,
   timeout : Int,
+  auth : BearerAuth?,
 ) -> Bytes {
   for attempt = 1; ; attempt = attempt + 1 {
-    match fetch_once(spec, lease, timeout, delay) {
+    match fetch_once(spec, lease, timeout, delay, auth) {
       Payload(bytes) => return bytes
       Retry(reason, wait) => {
         if attempt == attempts {

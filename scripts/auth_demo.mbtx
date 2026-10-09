@@ -1,0 +1,212 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/http",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/async@0.21.3/socket",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string" @strconv,
+}
+
+///|
+async fn invoke(
+  url : String,
+  path : String,
+  token : String,
+  extra : Array[String],
+  authenticated? : Bool = true,
+) -> @shell.Output {
+  let args = [
+    "run", "--target", "native", "cmd/fetch", "--", "--url", url, "--output", path,
+    "--length", "28008", "--etag", "\"fixture-v1\"", "--sha256", "dca55780e807e6b6dc5dafe53a621bf99929681551ab85bb4a27f5142e208042",
+  ]
+  if !extra.contains("--audit") {
+    args.append(["--chunk-size", "4096", "--parallel", "1"])
+  }
+  if authenticated {
+    args.append(["--bearer-env", "MFL_DEMO_TOKEN", "--allow-loopback-auth"])
+  }
+  args.append(extra)
+  @shell.Cmd("moon", args, env={ "MFL_DEMO_TOKEN": token }, inherit_env=true).output(
+    timeout_ms=120000,
+  )
+}
+
+///|
+fn no_token(output : @shell.Output, one : String, two : String) -> Unit raise {
+  let text = output.stdout() + output.stderr()
+  assert_true(!text.contains(one) && !text.contains(two))
+}
+
+///|
+async fn main {
+  // Fabricated public test credentials, never real account secrets.
+  let one = "public-fixture-credential-v1"
+  let two = "public-fixture-credential-v2"
+  let mut expected = one
+  let mut transient = true
+  let data = @fs.read_file("fixtures/earthquakes-2024-01-01.csv").binary()
+  let dir = @fs.tmpdir(prefix="moonfetchledger-auth-demo-")
+  defer @fs.rmdir(dir, recursive=true)
+  let requested : Array[String] = []
+  @async.with_task_group(group => {
+    let server = @socket.TcpServer::TcpServer(
+      @socket.Addr::parse("127.0.0.1:0"),
+    )
+    defer server.close()
+    let url = "http://127.0.0.1:\{server.addr.port()}"
+    let serving = group.spawn(() => {
+      while true {
+        let (raw, _) = server.accept()
+        let conn = @http.ServerConnection::new(raw)
+        let request = conn.read_request()
+        if request.path == "/stop" {
+          conn.send_response(200, "OK", extra_headers={ "Connection": "close" })
+          conn.end_response()
+          conn.close()
+          break
+        }
+        group.spawn_bg(allow_failure=true, () => {
+          defer conn.close()
+          requested.push(request.path)
+          if request.headers.get("Authorization") != Some("Bearer " + expected) {
+            conn.send_response(401, "Unauthorized", extra_headers={
+              "Connection": "close",
+            })
+          } else if request.path == "/forbidden" {
+            conn.send_response(403, "Forbidden", extra_headers={
+              "Connection": "close",
+            })
+          } else if request.path == "/redirect" {
+            conn.send_response(302, "Found", extra_headers={
+              "Location": url + "/unexpected",
+              "Connection": "close",
+            })
+          } else if request.path == "/reflect" {
+            // The normal sender refuses malformed headers before transmission.
+            raw.write(
+              b"HTTP/1.1 206 Partial Content\r\nContent-Length: public-fixture-credential-v2\r\nConnection: close\r\n\r\n",
+            )
+            return
+          } else if request.path == "/transient" && transient {
+            transient = false
+            conn.send_response(503, "Unavailable", extra_headers={
+              "Retry-After": "0",
+              "Connection": "close",
+            })
+          } else {
+            assert_eq(request.headers.get("If-Range"), Some("\"fixture-v1\""))
+            assert_eq(request.headers.get("Accept-Encoding"), Some("identity"))
+            let bounds = request.headers.get("Range").unwrap()[6:]
+              .split("-")
+              .collect()
+            let start = @strconv.parse_int(bounds[0])
+            let end = @strconv.parse_int(bounds[1]) + 1
+            conn.send_response(206, "Partial Content", extra_headers={
+              "ETag": "\"fixture-v1\"",
+              "Content-Range": "bytes \{start}-\{end - 1}/28008",
+              "Connection": "close",
+            })
+            conn.write(data[start:end].to_owned())
+          }
+          conn.end_response()
+        })
+      }
+    })
+    let path = dir + "/private.csv"
+    let missing = invoke(url + "/data", path, "", [], authenticated=false)
+    assert_true(missing.exit_code() != 0)
+    assert_eq(requested.length(), 1)
+    let first = invoke(url + "/data", path, one, [
+      "--stop-after-blocks", "2", "--progress",
+    ])
+    first.check()
+    no_token(first, one, two)
+    assert_true(first.stdout().contains("paused: confirmed=8192 fetched=2"))
+    let checkpoint = @fs.read_file(path + ".mfl").text()
+    assert_true(!checkpoint.contains(one) && !checkpoint.contains(two))
+    expected = two
+    let before = requested.length()
+    let expired = invoke(url + "/data", path, one, ["--max-attempts", "3"])
+    assert_true(expired.exit_code() != 0)
+    assert_true((expired.stdout() + expired.stderr()).contains("HTTP 401"))
+    no_token(expired, one, two)
+    assert_eq(requested.length(), before + 1)
+    assert_eq(@fs.read_file(path + ".mfl").text(), checkpoint)
+    let resumed = invoke(url + "/data", path, two, [])
+    resumed.check()
+    no_token(resumed, one, two)
+    assert_true(resumed.stdout().contains("fetched=5 retained=8192"))
+    assert_eq(@fs.read_file(path).binary(), data)
+    let final_checkpoint = @fs.read_file(path + ".mfl").text()
+    assert_true(
+      !final_checkpoint.contains(one) && !final_checkpoint.contains(two),
+    )
+    let before = requested.length()
+    let offline = invoke(
+      url + "/data",
+      path,
+      "",
+      ["--audit"],
+      authenticated=false,
+    )
+    offline.check()
+    assert_eq(
+      @json.parse(offline.stdout().trim()).stringify(),
+      "[\"MFLAUDIT1\",true,true,\"28008\",\"28008\",[],[]]",
+    )
+    let invalid_mode = invoke(url + "/data", path, two, ["--audit"])
+    assert_true(invalid_mode.exit_code() != 0)
+    let complete = invoke(url + "/data", path, "", [], authenticated=false)
+    complete.check()
+    assert_eq(requested.length(), before)
+    assert_eq(@fs.read_file(path + ".mfl").text(), final_checkpoint)
+    for endpoint in ["forbidden", "redirect", "reflect"] {
+      let before = requested.length()
+      let refused = invoke(url + "/" + endpoint, dir + "/" + endpoint, two, [
+        "--max-attempts", "3",
+      ])
+      assert_true(refused.exit_code() != 0)
+      no_token(refused, one, two)
+      assert_eq(requested.length(), before + 1)
+      assert_eq(@fs.file_size(dir + "/" + endpoint), 0L)
+      if endpoint == "forbidden" {
+        assert_true((refused.stdout() + refused.stderr()).contains("HTTP 403"))
+      }
+      if endpoint == "reflect" {
+        assert_true(
+          (refused.stdout() + refused.stderr()).contains(
+            "authenticated HTTP I/O failed",
+          ),
+        )
+      }
+    }
+    assert_true(!requested.contains("/unexpected"))
+    let before = requested.length()
+    let retried = invoke(url + "/transient", dir + "/transient.csv", two, [
+      "--max-attempts", "2", "--retry-delay-ms", "0",
+    ])
+    retried.check()
+    no_token(retried, one, two)
+    assert_eq(requested.length(), before + 8)
+    assert_eq(@fs.read_file(dir + "/transient.csv").binary(), data)
+    let invalid = invoke(
+      url + "/data",
+      dir + "/invalid",
+      "secret\r\nInjected:header",
+      [],
+    )
+    assert_true(invalid.exit_code() != 0)
+    assert_true(
+      !(invalid.stdout() + invalid.stderr()).contains("Injected:header"),
+    )
+    assert_true(!@fs.exists(dir + "/invalid.mfl.lock"))
+    let (stopped, _) = @http.get(url + "/stop")
+    assert_eq(stopped.code, 200)
+    serving.wait()
+    println(
+      "authenticated recovery verified: environment-only credentials, rotation retaining 8192 bytes, five-block resume, 401/403 refusal, no redirect forwarding, redacted parser errors, authenticated retry and offline reuse",
+    )
+  })
+}

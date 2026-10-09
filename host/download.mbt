@@ -38,8 +38,9 @@ async fn receive(
   delay : Int,
   timeout : Int,
   progress : ProgressTracker,
+  auth : BearerAuth?,
 ) -> Unit {
-  let bytes = fetch(session.spec, lease, attempts, delay, timeout)
+  let bytes = fetch(session.spec, lease, attempts, delay, timeout, auth)
   let prepared = session.prepare_chunk(
     lease,
     bytes,
@@ -70,6 +71,7 @@ async fn receive(
 /// Await on_progress serially after saved recovery/blocks and at the final phase.
 /// Callback errors propagate without retrying notification or reverting saved data.
 /// pause_signal stops new batches; the current batch drains and saves normally.
+/// auth is transient and bound to this exact resource, independent of checkpoints.
 pub async fn download(
   spec : @ledger.ObjectSpec,
   output : String,
@@ -81,7 +83,11 @@ pub async fn download(
   request_timeout_ms? : Int = 30000,
   on_progress? : async (DownloadProgress) -> Unit,
   pause_signal? : @ledger.PauseSignal,
+  auth? : BearerAuth,
 ) -> DownloadReport {
+  if auth is Some(credential) {
+    credential.check_resource(spec.resource)
+  }
   if max_attempts < 1 ||
     max_attempts > 8 ||
     retry_delay_ms < 0 ||
@@ -168,7 +174,7 @@ pub async fn download(
         jobs.push(() => {
           receive(
             session, lease, file, mutex, checkpoint, max_attempts, retry_delay_ms,
-            request_timeout_ms, progress,
+            request_timeout_ms, progress, auth,
           )
         })
       }

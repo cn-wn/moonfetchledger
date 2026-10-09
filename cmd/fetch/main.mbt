@@ -34,6 +34,7 @@ async fn run() -> Unit {
   let mut auditing = false
   let mut adopting = false
   let mut progress = false
+  let mut loopback_auth = false
   for i = 1; i < args.length(); {
     let flag = args[i]
     if flag == "--" {
@@ -58,6 +59,9 @@ async fn run() -> Unit {
       println(
         "Add --progress to emit MFLPROGRESS1 JSON lines during downloads, followed by the normal summary.",
       )
+      println(
+        "Add --bearer-env NAME to read a transient Bearer token from an environment variable; HTTPS required. --allow-loopback-auth permits only 127.0.0.1 HTTP for local testing.",
+      )
       return
     }
     if flag == "--audit" {
@@ -81,10 +85,17 @@ async fn run() -> Unit {
       progress = true
       continue i + 1
     }
+    if flag == "--allow-loopback-auth" {
+      if loopback_auth {
+        fail("duplicate option: --allow-loopback-auth")
+      }
+      loopback_auth = true
+      continue i + 1
+    }
     if ![
         "--url", "--output", "--length", "--etag", "--sha256", "--chunk-size", "--parallel",
         "--stop-after-blocks", "--max-attempts", "--retry-delay-ms", "--request-timeout-ms",
-        "--export-to", "--repair-from",
+        "--export-to", "--repair-from", "--bearer-env",
       ].contains(flag) {
       fail("unknown option: \{flag}; use --help")
     }
@@ -100,6 +111,16 @@ async fn run() -> Unit {
     argument(values, "--etag"),
     argument(values, "--sha256"),
   )
+  if loopback_auth &&
+    (
+      !values.contains("--bearer-env") ||
+      auditing ||
+      adopting ||
+      values.contains("--export-to") ||
+      values.contains("--repair-from")
+    ) {
+    fail("--allow-loopback-auth requires --bearer-env in download mode")
+  }
   if progress &&
     (
       auditing ||
@@ -177,6 +198,32 @@ async fn run() -> Unit {
     )
     return
   }
+  let auth = match values.get("--bearer-env") {
+    None => None
+    Some(name) => {
+      if name.is_empty() || name.length() > 128 {
+        fail("--bearer-env requires an environment variable identifier")
+      }
+      for i, c in name {
+        if !((c >= 'a' && c <= 'z') ||
+          (c >= 'A' && c <= 'Z') ||
+          c == '_' ||
+          (i > 0 && c >= '0' && c <= '9')) {
+          fail("--bearer-env requires an environment variable identifier")
+        }
+      }
+      let token = @env.get_env_var(name).unwrap_or_else(() => {
+        fail("Bearer environment variable is unset")
+      })
+      Some(
+        @host.BearerAuth::new(
+          spec.resource,
+          token,
+          allow_loopback_http=loopback_auth,
+        ),
+      )
+    }
+  }
   let report = @host.download(
     spec,
     argument(values, "--output"),
@@ -187,6 +234,7 @@ async fn run() -> Unit {
     retry_delay_ms=small(values, "--retry-delay-ms", 200),
     request_timeout_ms=small(values, "--request-timeout-ms", 30000),
     on_progress=event => if progress { println(event.to_json().stringify()) },
+    auth?,
   )
   println(
     "\{if report.complete { "complete" } else { "paused" }}: confirmed=\{report.confirmed_bytes} fetched=\{report.downloaded_blocks} retained=\{report.recovery.retained_bytes} invalidated=\{report.recovery.invalidated.length()}",

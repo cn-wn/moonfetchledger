@@ -19,7 +19,8 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
 - Native host adds response-range validation, preservation of unrelated/extra
   data, exclusive-lock/reopen, checkpoint preservation and retry-budget/wait-hint
   boundary tests, read-only auditing, shared/exclusive lock interaction and
-  whole-file integrity, local adoption, export, repair, progress and pause (48 total on native).
+  whole-file integrity, adoption, export, repair, progress, pause and authentication
+  (51 total on native).
 - Coverage projection: all 128 confirmation masks for seven blocks, including
   reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
   return arrays, checkpoint preservation, restoration gate and maximum length.
@@ -65,6 +66,15 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
   remaining blocks, empty completion and fatal version errors after a pause.
   The real-data controlled example drains three blocks, retains 12288 bytes and
   fetches four remaining blocks before full verification and zero-fetch reopen.
+- Bearer credentials: grammar/length boundaries, explicit loopback policy,
+  malformed/unsupported URLs and exact resource binding before any file creation.
+  Native tests verify rotation/resume retaining three bytes, one-request 401
+  even with retries enabled and a 302 rejected without forwarding.
+  The real-data CLI demo verifies environment input, two-block pause, expired
+  credentials, five-block resume retaining 8192 bytes, token-free checkpoints and
+  output, offline reuse, 403/302 refusal, reflected malformed-header redaction and
+  authenticated 503 retry. TLS defaults are inspected in the pinned dependency;
+  the reproducible authentication workflow runs over explicit test-only loopback.
 - Truncated checkpoints, malformed/unknown data, cancellation, foreign leases,
   rejected responses, failed readback, missing/corrupt blocks and final digests.
 - Real data assembly: 28008 bytes, one invalidated block, final SHA-256
