@@ -161,6 +161,34 @@ pub fn Session::confirmed_bytes(self : Session) -> Int64 {
 }
 
 ///|
+/// Fresh, sorted, coalesced half-open ranges not yet confirmed by readback.
+/// Outstanding reservations are included. Finish restoration before inspecting
+/// coverage; this method does not reserve requests or mutate the session.
+pub fn Session::unconfirmed_ranges(
+  self : Session,
+) -> Array[ByteRange] raise LedgerError {
+  if self.recovering {
+    raise RecoveryRequired
+  }
+  let ranges : Array[ByteRange] = []
+  let mut start : Int64? = None
+  for i, block in self.blocks {
+    match block {
+      Confirmed(_, _) =>
+        if start is Some(first) {
+          ranges.push({ start: first, end: self.block_range(i).start, })
+          start = None
+        }
+      _ => if start is None { start = Some(self.block_range(i).start) }
+    }
+  }
+  if start is Some(first) {
+    ranges.push({ start: first, end: self.spec.length, })
+  }
+  ranges
+}
+
+///|
 /// Restored blocks requiring readback, returned as a fresh array.
 pub fn Session::recovery_ranges(self : Session) -> Array[ByteRange] {
   let ranges = []

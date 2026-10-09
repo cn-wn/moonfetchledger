@@ -18,8 +18,10 @@ async fn invoke(
   let args = [
     "run", "--target", "native", "cmd/fetch", "--", "--url", url, "--output", path,
     "--length", "28008", "--etag", "\"fixture-v1\"", "--sha256", "dca55780e807e6b6dc5dafe53a621bf99929681551ab85bb4a27f5142e208042",
-    "--chunk-size", "4096",
   ]
+  if !extra.contains("--audit") {
+    args.append(["--chunk-size", "4096"])
+  }
   args.append(extra)
   @shell.Cmd("moon", args).output(timeout_ms=120000)
 }
@@ -131,6 +133,30 @@ async fn main {
     corrupt.write_at(b"\x00", position=3L)
     corrupt.sync()
     corrupt.close()
+    let damaged_bytes = @fs.read_file(path).binary()
+    let damaged_checkpoint = @fs.read_file(path + ".mfl").binary()
+    let lock_bytes = @fs.read_file(path + ".mfl.lock").binary()
+    let requests_before_audit = requested.length()
+    let audit = invoke(url + "/data", path, ["--audit"])
+    audit.check()
+    let audit_json = @json.parse(audit.stdout().trim())
+    assert_eq(
+      audit_json.stringify(),
+      "[\"MFLAUDIT1\",false,true,\"12288\",\"8192\",[[\"0\",\"4096\"],[\"12288\",\"28008\"]],[[\"0\",\"4096\"]]]",
+    )
+    assert_eq(@json.parse(audit_json.stringify()), audit_json)
+    let repeated_audit = invoke(url + "/data", path, ["--audit"])
+    repeated_audit.check()
+    assert_eq(repeated_audit.stdout(), audit.stdout())
+    let rejected_audit_option = invoke(url + "/data", path, [
+      "--audit", "--parallel", "1",
+    ])
+    assert_true(rejected_audit_option.exit_code() != 0)
+    assert_eq(requested.length(), requests_before_audit)
+    assert_eq(@fs.read_file(path).binary(), damaged_bytes)
+    assert_eq(@fs.read_file(path + ".mfl").binary(), damaged_checkpoint)
+    assert_eq(@fs.read_file(path + ".mfl.lock").binary(), lock_bytes)
+    assert_true(!@fs.exists(path + ".mfl.next"))
     requested.clear()
     completed.clear()
     let second = invoke(url + "/data", path, [])
@@ -149,6 +175,13 @@ async fn main {
     assert_eq(@fs.read_file(path).binary(), data)
     let checkpoint = @fs.read_file(path + ".mfl").text()
     requested.clear()
+    let complete_audit = invoke(url + "/data", path, ["--audit"])
+    complete_audit.check()
+    assert_eq(
+      @json.parse(complete_audit.stdout().trim()).stringify(),
+      "[\"MFLAUDIT1\",true,true,\"28008\",\"28008\",[],[]]",
+    )
+    assert_eq(@fs.read_file(path + ".mfl").text(), checkpoint)
     let third = invoke(url + "/data", path, [])
     third.check()
     assert_eq(requested.length(), 0)
@@ -212,7 +245,7 @@ async fn main {
     println(first.stdout().trim())
     println(second.stdout().trim())
     println(
-      "offline HTTP/disk recovery verified: reverse arrivals, selective refill, stable checkpoint, fatal version refusal, 503/429 retries, bounded exhaustion/restart and timeout recovery",
+      "offline HTTP/disk recovery verified: read-only deterministic audit, reverse arrivals, selective refill, stable checkpoint, fatal version refusal, 503/429 retries, bounded exhaustion/restart and timeout recovery",
     )
   })
 }

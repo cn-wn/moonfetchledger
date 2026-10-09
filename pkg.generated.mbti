@@ -74,6 +74,7 @@ pub fn Session::reconcile_block(Self, ByteRange, Bytes?) -> Bool raise LedgerErr
 pub fn Session::recovery_ranges(Self) -> Array[ByteRange]
 pub fn Session::release(Self, Lease) -> Unit raise LedgerError
 pub fn Session::reserve_missing(Self) -> Lease? raise LedgerError
+pub fn Session::unconfirmed_ranges(Self) -> Array[ByteRange] raise LedgerError
 pub fn Session::verifier(Self) -> Verifier raise LedgerError
 pub fn Session::verify_complete(Self, (ByteRange) -> Bytes raise) -> Unit raise
 

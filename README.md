@@ -18,6 +18,8 @@ fixed-block coverage rather than trusting file length or a downloaded-byte count
   parallel requests, synced write/readback, replace-on-save checkpoints and repair.
 - Opt-in bounded retries for 429/503 and request timeouts, with validated wait hints;
   version, representation and storage errors still fail immediately.
+- Offline native audit and deterministic JSON reports: actual disk readback,
+  corrupt/missing block detection, coalesced gap planning and final integrity check.
 
 Core targets: wasm, wasm-gc, JavaScript and native. Host and actual validation
 boundaries are recorded in `docs/validation.md`.
@@ -53,6 +55,8 @@ final bytes. It also tests bad-response refusal and successful retry. See
 [the end-to-end workflow](docs/recovery-demo.md) for commands and exact boundaries.
 See [bounded retry behavior](docs/retry.md) for CLI options, supported failures
 and explicit wait-hint limitations.
+Use [offline audit](docs/audit.md) to inspect retained files without downloading
+or rewriting them: `cmd/fetch -- --audit` with the same required identity options.
 
 ## Integration contract
 
@@ -66,6 +70,8 @@ and explicit wait-hint limitations.
    then `finish_recovery`. None means absent/truncated data; propagate I/O errors.
 6. `verifier` returns `next_range/push/finish` for asynchronous reads;
    `verify_complete` is its synchronous callback convenience.
+7. `unconfirmed_ranges` returns a fresh coalesced coverage projection, including
+   outstanding reservations, after recovery finishes. It does not reserve requests.
 
 Serialize session mutations. Separate leases permit concurrent requests, not
 unsynchronized OS-thread mutation. Readback depends on an honest storage adapter;

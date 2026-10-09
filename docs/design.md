@@ -33,6 +33,10 @@ response/version validation, crash-state reconciliation and integrity checks.
 - host.download is the optional native HTTP/filesystem reference integration.
   It returns completion, actual confirmed bytes, fetched blocks, retained bytes
   and invalidated ranges. Its errors remain distinct from LedgerError/I/O errors.
+- Session.unconfirmed_ranges projects sorted/coalesced gaps without mutations;
+  host.audit inspects retained disk files without network or content writes and
+  requires whole-file SHA-256 success before reporting completion. Its report
+  serializes sizes/offsets as decimal strings, independently of checkpoint schema.
 
 The generated interface files are the exact API source of truth. Session changes
 must be serialized; parallel leases do not provide OS-thread synchronization.
@@ -61,7 +65,8 @@ the demo serves the bundled public-domain USGS snapshot over loopback.
 
 - Implemented: object-bound sparse receipt and storage reconciliation, all core
   target tests, native host/CLI, offline selective-repair workflow, bounded block
-  retries for transient HTTP status and request timeout.
+  retries for transient HTTP status and request timeout, read-only disk audit
+  with coalesced gap reporting and deterministic JSON export.
 - Planned: cancellation reporting informed by real clients; authenticated
   release-manifest integrations.
 - Planned: independent browser storage adapter with the same receive contract;

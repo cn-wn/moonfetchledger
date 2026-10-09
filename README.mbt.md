@@ -21,6 +21,7 @@ test {
     total=3L,
   )
   session.commit_written(prepared, bytes)
+  assert_true(session.unconfirmed_ranges().is_empty())
   session.verify_complete(_ => bytes)
   assert_eq(session.confirmed_bytes(), 3L)
 }

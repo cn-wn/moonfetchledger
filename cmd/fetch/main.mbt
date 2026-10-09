@@ -31,6 +31,7 @@ fn small(
 async fn run() -> Unit {
   let args = @env.args()
   let values : Map[String, String] = Map([])
+  let mut auditing = false
   for i = 1; i < args.length(); {
     let flag = args[i]
     if flag == "--" {
@@ -40,7 +41,17 @@ async fn run() -> Unit {
       println(
         "fetch --url URL --output PATH --length N --etag QUOTED_ETAG --sha256 HEX [--chunk-size N] [--parallel 1..16] [--stop-after-blocks N] [--max-attempts 1..8] [--retry-delay-ms 0..30000] [--request-timeout-ms 1..120000]",
       )
+      println(
+        "Add --audit to inspect an existing session offline and emit MFLAUDIT1 JSON; download options are rejected in audit mode.",
+      )
       return
+    }
+    if flag == "--audit" {
+      if auditing {
+        fail("duplicate option: --audit")
+      }
+      auditing = true
+      continue i + 1
     }
     if ![
         "--url", "--output", "--length", "--etag", "--sha256", "--chunk-size", "--parallel",
@@ -60,6 +71,17 @@ async fn run() -> Unit {
     argument(values, "--etag"),
     argument(values, "--sha256"),
   )
+  if auditing {
+    for key, _ in values {
+      if !["--url", "--output", "--length", "--etag", "--sha256"].contains(key) {
+        fail("download option \{key} is unsupported with --audit")
+      }
+    }
+    println(
+      @host.audit(spec, argument(values, "--output")).to_json().stringify(),
+    )
+    return
+  }
   let report = @host.download(
     spec,
     argument(values, "--output"),

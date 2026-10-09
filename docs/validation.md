@@ -14,11 +14,15 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
 
 - Windows: strict core tests on wasm, wasm-gc and js.
 - Ubuntu/WSL, GCC 12.5: actual native tests and actual native assembly example.
-- 14 tests per target, including the checked README. Generated property cases cover
+- 16 tests per portable target, including the checked README. Generated property cases cover
   129 binary sizes x 4 block sizes (516 complete reception/recovery round trips).
 - Native host adds response-range validation, preservation of unrelated/extra
   data, exclusive-lock/reopen, checkpoint preservation and retry-budget/wait-hint
-  boundary tests (20 total on native).
+  boundary tests, read-only auditing, shared/exclusive lock interaction and
+  whole-file integrity (25 total on native).
+- Coverage projection: all 128 confirmation masks for seven blocks, including
+  reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
+  return arrays, checkpoint preservation, restoration gate and maximum length.
 - Offline actual HTTP/disk workflow passed on Linux: reverse arrival order,
   separate paused/resumed processes, 8192 retained bytes, one invalidated block,
   exactly five repair requests, full-byte equality, no requests on complete reopen,
@@ -27,6 +31,11 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
   seven committed blocks; three-attempt exhaustion with zero written bytes and
   empty coverage followed by successful restart; timed-out request then successful
   retry; changed ETag still refused after one request with retries enabled.
+- Offline audit before repair returns exactly 8192 confirmed bytes and two gaps;
+  repeated reports are identical, round-trip JSON losslessly, issue no requests
+  and preserve output/checkpoint/lock bytes. Complete audit verifies SHA-256 and
+  emits an empty gap list. Native tests cover truncated/absent files, absent empty
+  output, bad final hash, wrong identity, malformed schema and extra-data refusal.
 - Truncated checkpoints, malformed/unknown data, cancellation, foreign leases,
   rejected responses, failed readback, missing/corrupt blocks and final digests.
 - Real data assembly: 28008 bytes, one invalidated block, final SHA-256
