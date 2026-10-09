@@ -49,6 +49,9 @@ response/version validation, crash-state reconciliation and integrity checks.
 - host.download's optional on_progress observer receives saved recovery/block
   snapshots and pause/verified completion events. Observer failures preserve saved
   progress for restart; the CLI can emit deterministic MFLPROGRESS1 JSON lines.
+- ObjectSpec.to_manifest/from_manifest serialize exact release identity. Native
+  write_manifest/load_manifest publish a new file and verify an independent byte
+  hash before parsing. The CLI uses the pinned identity in every artifact mode.
 
 The generated interface files are the exact API source of truth. Session changes
 must be serialized; parallel leases do not provide OS-thread synchronization.
@@ -89,7 +92,9 @@ the demo serves the bundled public-domain USGS snapshot over loopback.
   saved coverage, with completion taking precedence and errors still propagating.
 - Implemented: transient resource-bound Bearer authentication, environment-only
   CLI credential input, rotation/resume, immediate 401/403 refusal and no redirects.
-- Planned: authenticated release-manifest integrations beyond transport credentials.
+- Implemented: pinned release identity publication/loading, strict schema and byte
+  bounds, no identity overrides, download/resume and complete offline integration.
+- Planned: signed release metadata integration beyond independent SHA-256 pins.
 - Planned: independent browser storage adapter with the same receive contract;
   versioned checkpoint migrations only when a concrete schema extension is needed.
 

@@ -1,5 +1,24 @@
 # Checked public API example
 
+A publisher can distribute one identity manifest; parsing requires separately
+trusted input. The native loader additionally verifies an independent byte hash.
+
+```mbt check
+///|
+test {
+  let object = @moonfetchledger.ObjectSpec::new(
+    "https://example.test/a",
+    3L,
+    "\"v1\"",
+    @moonfetchledger.digest(b"abc"),
+  )
+  let manifest = object.to_manifest()
+  let restored = @moonfetchledger.ObjectSpec::from_manifest(manifest)
+  assert_eq(restored, object)
+  assert_eq(restored.to_manifest(), manifest)
+}
+```
+
 ```mbt check
 ///|
 test {

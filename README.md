@@ -32,6 +32,8 @@ fixed-block coverage rather than trusting file length or a downloaded-byte count
   incomplete coverage and resume with a fresh signal without refetching valid blocks.
 - Transient resource-bound Bearer credentials for private artifacts, environment
   input in the CLI and credential rotation without changing recovery identity.
+- Pinned release identity manifests: deterministic publication, hash-before-parse
+  bounded loading and the same manifest for download, resume and offline operations.
 
 Core targets: wasm, wasm-gc, JavaScript and native. Host and actual validation
 boundaries are recorded in `docs/validation.md`.
@@ -81,6 +83,9 @@ Use [controlled pause](docs/pause.md) for application-driven pause/resume;
 `moon run --target native examples/controlled` demonstrates it with real data.
 Use [authenticated download](docs/auth.md) with `--bearer-env VARIABLE_NAME`;
 `moon run scripts/auth_demo.mbtx` verifies credential rotation and recovery offline.
+Use [pinned manifests](docs/manifest.md) with `--manifest FILE --manifest-sha256 HEX`
+instead of the four inline identity arguments. `moon run scripts/manifest_demo.mbtx`
+verifies publication, authenticated resume and stopped-origin offline operations.
 
 ## Integration contract
 
@@ -126,7 +131,7 @@ This is a complementary receive/storage-state layer, not a replacement HTTP stac
 model hub, tus upload protocol or content-deduplication engine. We make no claim
 of ecosystem uniqueness or performance superiority. API review: `docs/ecosystem.md`.
 
-Planned: authenticated manifest integration and a browser storage
+Planned: signed release metadata integration and a browser storage
 adapter, driven by downstream needs. [Design and roadmap](docs/design.md).
 
 Apache-2.0. Data/dependency sources: `THIRD_PARTY_NOTICES.md`.

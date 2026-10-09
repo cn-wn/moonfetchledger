@@ -14,6 +14,7 @@ pub fn restore(String, ObjectSpec) -> Session raise LedgerError
 pub suberror LedgerError {
   InvalidSpec(String)
   InvalidCheckpoint(String)
+  InvalidManifest(String)
   StaleLease
   InvalidResponse(String)
   ReadbackMismatch(Int64)
@@ -45,8 +46,10 @@ pub struct ObjectSpec {
   sha256 : String
 } derive(Eq, @debug.Debug)
 pub fn ObjectSpec::equal(Self, Self) -> Bool
+pub fn ObjectSpec::from_manifest(String) -> Self raise LedgerError
 pub fn ObjectSpec::new(String, Int64, String, String) -> Self raise LedgerError
 pub fn ObjectSpec::not_equal(Self, Self) -> Bool
+pub fn ObjectSpec::to_manifest(Self) -> String
 pub fn ObjectSpec::to_repr(Self) -> @debug.Repr
 
 pub struct PauseSignal {

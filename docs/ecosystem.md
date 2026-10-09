@@ -17,3 +17,9 @@ parsing, tus uploads or content-defined chunking.
 
 New, unpublished or poorly indexed packages may have been missed. No originality,
 ecosystem exclusivity or performance claim is made.
+
+The release-manifest extension is deliberately limited to the existing single
+ObjectSpec identity and its recovery workflow. It is not a content/chunk manifest
+matcher or a general release JSON/signature toolkit. It adds deterministic identity
+publication and an independently pinned loading gate to download and offline modes;
+it does not reproduce content-defined chunk lists, matching or deduplication APIs.

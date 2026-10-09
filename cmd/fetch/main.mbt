@@ -45,6 +45,9 @@ async fn run() -> Unit {
         "fetch --url URL --output PATH --length N --etag QUOTED_ETAG --sha256 HEX [--chunk-size N] [--parallel 1..16] [--stop-after-blocks N] [--max-attempts 1..8] [--retry-delay-ms 0..30000] [--request-timeout-ms 1..120000]",
       )
       println(
+        "Use --manifest FILE --manifest-sha256 TRUSTED_HEX instead of all four inline identity options, including in offline modes. --write-manifest NEW_PATH publishes inline identity and prints its manifest SHA-256; no --output or download options allowed.",
+      )
+      println(
         "Add --audit to inspect an existing session offline and emit MFLAUDIT1 JSON; download options are rejected in audit mode.",
       )
       println(
@@ -95,7 +98,8 @@ async fn run() -> Unit {
     if ![
         "--url", "--output", "--length", "--etag", "--sha256", "--chunk-size", "--parallel",
         "--stop-after-blocks", "--max-attempts", "--retry-delay-ms", "--request-timeout-ms",
-        "--export-to", "--repair-from", "--bearer-env",
+        "--export-to", "--repair-from", "--bearer-env", "--manifest", "--manifest-sha256",
+        "--write-manifest",
       ].contains(flag) {
       fail("unknown option: \{flag}; use --help")
     }
@@ -105,12 +109,26 @@ async fn run() -> Unit {
     values[flag] = args[i + 1]
     continue i + 2
   }
-  let spec = @ledger.ObjectSpec::new(
-    argument(values, "--url"),
-    integer(argument(values, "--length"), "--length"),
-    argument(values, "--etag"),
-    argument(values, "--sha256"),
-  )
+  let spec = specification(values)
+  if values.get("--write-manifest") is Some(destination) {
+    if auditing || adopting || progress || loopback_auth {
+      fail(
+        "--write-manifest accepts only inline identity and a new destination",
+      )
+    }
+    for key, _ in values {
+      if !["--url", "--length", "--etag", "--sha256", "--write-manifest"].contains(
+          key,
+        ) {
+        fail(
+          "--write-manifest accepts only inline identity and a new destination",
+        )
+      }
+    }
+    let pin = @host.write_manifest(spec, destination)
+    println("manifest: sha256=\{pin}")
+    return
+  }
   if loopback_auth &&
     (
       !values.contains("--bearer-env") ||
@@ -137,9 +155,7 @@ async fn run() -> Unit {
       )
     }
     for key, _ in values {
-      if ![
-          "--url", "--output", "--length", "--etag", "--sha256", "--repair-from",
-        ].contains(key) {
+      if !identity_option(key) && key != "--repair-from" {
         fail("download option \{key} is unsupported with --repair-from")
       }
     }
@@ -158,9 +174,7 @@ async fn run() -> Unit {
       fail("--export-to, --adopt and --audit are mutually exclusive")
     }
     for key, _ in values {
-      if !["--url", "--output", "--length", "--etag", "--sha256", "--export-to"].contains(
-          key,
-        ) {
+      if !identity_option(key) && key != "--export-to" {
         fail("download option \{key} is unsupported with --export-to")
       }
     }
@@ -173,9 +187,7 @@ async fn run() -> Unit {
       fail("--adopt and --audit are mutually exclusive")
     }
     for key, _ in values {
-      if ![
-          "--url", "--output", "--length", "--etag", "--sha256", "--chunk-size",
-        ].contains(key) {
+      if !identity_option(key) && key != "--chunk-size" {
         fail("download option \{key} is unsupported with --adopt")
       }
     }
@@ -189,7 +201,7 @@ async fn run() -> Unit {
   }
   if auditing {
     for key, _ in values {
-      if !["--url", "--output", "--length", "--etag", "--sha256"].contains(key) {
+      if !identity_option(key) {
         fail("download option \{key} is unsupported with --audit")
       }
     }

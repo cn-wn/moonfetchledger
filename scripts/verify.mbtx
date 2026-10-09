@@ -32,7 +32,7 @@ async fn main {
   checked(["fmt"])
   checked([
     "fmt", "--check", "scripts/verify.mbtx", "scripts/recovery_demo.mbtx", "scripts/local_storage_demo.mbtx",
-    "scripts/auth_demo.mbtx",
+    "scripts/auth_demo.mbtx", "scripts/manifest_demo.mbtx",
   ])
   checked(["info"])
   checked(["info", "--target", "native"])
@@ -51,6 +51,7 @@ async fn main {
   checked(["run", "scripts/local_storage_demo.mbtx"])
   checked(["run", "--target", "native", "examples/controlled"])
   checked(["run", "scripts/auth_demo.mbtx"])
+  checked(["run", "scripts/manifest_demo.mbtx"])
   println(
     "verified formatting, interfaces, four core targets, real-data assembly and HTTP/disk recovery",
   )

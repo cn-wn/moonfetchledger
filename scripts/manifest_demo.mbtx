@@ -1,0 +1,281 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/http",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/async@0.21.3/socket",
+  "moonbitlang/x@0.5.5/crypto",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string" @strconv,
+}
+
+///|
+fn hash(bytes : Bytes) -> String {
+  @crypto.bytes_to_hex_string(@crypto.sha256(bytes))
+}
+
+///|
+async fn call(
+  args : Array[String],
+  authenticated? : Bool = false,
+) -> @shell.Output {
+  let command = ["run", "--target", "native", "cmd/fetch", "--"]
+  command.append(args)
+  if authenticated {
+    command.append([
+      "--bearer-env", "MFL_MANIFEST_DEMO_TOKEN", "--allow-loopback-auth",
+    ])
+  }
+  @shell.Cmd(
+    "moon",
+    command,
+    env={ "MFL_MANIFEST_DEMO_TOKEN": "public-manifest-test-token" },
+    inherit_env=true,
+  ).output(timeout_ms=120000)
+}
+
+///|
+async fn invoke(
+  manifest : String,
+  pin : String,
+  path : String,
+  extra : Array[String],
+  authenticated? : Bool = false,
+) -> @shell.Output {
+  let args = [
+    "--manifest", manifest, "--manifest-sha256", pin, "--output", path,
+  ]
+  args.append(extra)
+  call(args, authenticated~)
+}
+
+///|
+async fn main {
+  let data = @fs.read_file("fixtures/earthquakes-2024-01-01.csv").binary()
+  assert_eq(
+    hash(data),
+    "dca55780e807e6b6dc5dafe53a621bf99929681551ab85bb4a27f5142e208042",
+  )
+  let dir = @fs.tmpdir(prefix="moonfetchledger-manifest-demo-")
+  defer @fs.rmdir(dir, recursive=true)
+  let manifest = dir + "/release.json"
+  let path = dir + "/retained.csv"
+  let requested : Array[Int] = []
+  @async.with_task_group(group => {
+    let server = @http.Server::Server(@socket.Addr::parse("127.0.0.1:0"))
+    defer server.close()
+    let url = "http://127.0.0.1:\{server.addr.port()}/data"
+    let serving = group.spawn(() => {
+      while true {
+        let (conn, _) = server.accept()
+        let request = conn.read_request()
+        if request.path == "/stop" {
+          conn.send_response(200, "OK", extra_headers={ "Connection": "close" })
+          conn.end_response()
+          conn.close()
+          break
+        }
+        group.spawn_bg(() => {
+          defer conn.close()
+          assert_eq(request.path, "/data")
+          assert_eq(
+            request.headers.get("Authorization"),
+            Some("Bearer public-manifest-test-token"),
+          )
+          assert_eq(request.headers.get("If-Range"), Some("\"fixture-v1\""))
+          assert_eq(request.headers.get("Accept-Encoding"), Some("identity"))
+          let bounds = request.headers.get("Range").unwrap()[6:]
+            .split("-")
+            .collect()
+          let start = @strconv.parse_int(bounds[0])
+          let end = @strconv.parse_int(bounds[1]) + 1
+          requested.push(start / 4096)
+          conn.send_response(206, "Partial Content", extra_headers={
+            "ETag": "\"fixture-v1\"",
+            "Content-Range": "bytes \{start}-\{end - 1}/28008",
+            "Connection": "close",
+          })
+          conn.write(data[start:end].to_owned())
+          conn.end_response()
+        })
+      }
+    })
+    let published = call([
+      "--url",
+      url,
+      "--length",
+      "28008",
+      "--etag",
+      "\"fixture-v1\"",
+      "--sha256",
+      hash(data),
+      "--write-manifest",
+      manifest,
+    ])
+    published.check()
+    let original = @fs.read_file(manifest).binary()
+    let pin = hash(original)
+    assert_eq(published.stdout().trim().to_owned(), "manifest: sha256=" + pin)
+    assert_true(!@fs.exists(manifest + ".next"))
+    for output in [manifest, dir + "/./release.json"] {
+      let aliased = invoke(manifest, pin, output, [])
+      assert_true(aliased.exit_code() != 0)
+      assert_true(
+        (aliased.stdout() + aliased.stderr()).contains("must not alias"),
+      )
+      assert_eq(@fs.read_file(manifest).binary(), original)
+      assert_true(!@fs.exists(manifest + ".mfl.lock"))
+    }
+    for suffix in [".mfl", ".mfl.lock", ".mfl.next"] {
+      let output = dir + "/reserved" + suffix
+      let input = output + suffix
+      @fs.write_file(input, original)
+      let aliased = invoke(input, pin, output, [])
+      assert_true(aliased.exit_code() != 0)
+      assert_true(!@fs.exists(output))
+      assert_eq(@fs.read_file(input).binary(), original)
+    }
+    let repeated = call([
+      "--url",
+      url,
+      "--length",
+      "28008",
+      "--etag",
+      "\"fixture-v1\"",
+      "--sha256",
+      hash(data),
+      "--write-manifest",
+      manifest,
+    ])
+    assert_true(repeated.exit_code() != 0)
+    assert_eq(@fs.read_file(manifest).binary(), original)
+    let refused = dir + "/refused.csv"
+    let conflicting = invoke(manifest, pin, refused, ["--url", url])
+    assert_true(conflicting.exit_code() != 0)
+    assert_true(
+      (conflicting.stdout() + conflicting.stderr()).contains(
+        "mutually exclusive",
+      ),
+    )
+    let missing_pin = call(["--manifest", manifest, "--output", refused])
+    assert_true(missing_pin.exit_code() != 0)
+    let missing_file = call(["--manifest-sha256", pin, "--output", refused])
+    assert_true(missing_file.exit_code() != 0)
+    let wrong = invoke(manifest, hash(b"wrong pin"), refused, [])
+    assert_true(wrong.exit_code() != 0)
+    assert_true(!@fs.exists(refused) && !@fs.exists(refused + ".mfl.lock"))
+    assert_eq(requested.length(), 0)
+    let publisher_conflict = call([
+      "--url",
+      url,
+      "--length",
+      "28008",
+      "--etag",
+      "\"fixture-v1\"",
+      "--sha256",
+      hash(data),
+      "--write-manifest",
+      dir + "/invalid-publication.json",
+      "--stop-after-blocks",
+      "1",
+    ])
+    assert_true(publisher_conflict.exit_code() != 0)
+    assert_true(!@fs.exists(dir + "/invalid-publication.json.next"))
+    assert_true(!@fs.exists(dir + "/invalid-publication.json"))
+    let first = invoke(
+      manifest,
+      pin,
+      path,
+      ["--chunk-size", "4096", "--parallel", "1", "--stop-after-blocks", "2"],
+      authenticated=true,
+    )
+    first.check()
+    assert_true(first.stdout().contains("paused: confirmed=8192 fetched=2"))
+    let checkpoint = @fs.read_file(path + ".mfl").binary()
+    let partial = @fs.read_file(path).binary()
+    // Even a harmless whitespace change is rejected under an exact-byte pin.
+    @fs.write_file(manifest, @fs.read_file(manifest).text() + " ")
+    let changed = invoke(manifest, pin, path, [], authenticated=true)
+    assert_true(changed.exit_code() != 0)
+    assert_true((changed.stdout() + changed.stderr()).contains("trusted pin"))
+    assert_eq(@fs.read_file(path).binary(), partial)
+    assert_eq(@fs.read_file(path + ".mfl").binary(), checkpoint)
+    assert_eq(requested.length(), 2)
+    @fs.write_file(manifest, original)
+    let resumed = invoke(
+      manifest,
+      pin,
+      path,
+      ["--parallel", "1"],
+      authenticated=true,
+    )
+    resumed.check()
+    assert_true(resumed.stdout().contains("fetched=5 retained=8192"))
+    assert_eq(@fs.read_file(path).binary(), data)
+    assert_eq(requested, [0, 1, 2, 3, 4, 5, 6])
+    let (stopped, _) = @http.get("http://127.0.0.1:\{server.addr.port()}/stop")
+    assert_eq(stopped.code, 200)
+    serving.wait()
+    server.close()
+    let audit = invoke(manifest, pin, path, ["--audit"])
+    audit.check()
+    assert_eq(
+      @json.parse(audit.stdout().trim()).stringify(),
+      "[\"MFLAUDIT1\",true,true,\"28008\",\"28008\",[],[]]",
+    )
+    let reused = invoke(manifest, pin, path, [])
+    reused.check()
+    assert_true(reused.stdout().contains("fetched=0 retained=28008"))
+    let backup = dir + "/backup.csv"
+    @fs.write_file(backup, data)
+    let adopted = invoke(manifest, pin, backup, [
+      "--adopt", "--chunk-size", "4096",
+    ])
+    adopted.check()
+    let file = @fs.open(path, mode=ReadWrite)
+    file.write_at(b"\x00", position=3L)
+    file.sync()
+    file.close()
+    let repaired = invoke(manifest, pin, path, ["--repair-from", backup])
+    repaired.check()
+    assert_true(
+      repaired.stdout().contains("copied=1 retained=23912 invalidated=1"),
+    )
+    let ready = dir + "/ready.csv"
+    @fs.write_file(ready + ".next", original)
+    let aliased_export = invoke(ready + ".next", pin, path, [
+      "--export-to", ready,
+    ])
+    assert_true(aliased_export.exit_code() != 0)
+    assert_true(
+      (aliased_export.stdout() + aliased_export.stderr()).contains(
+        "must not alias",
+      ),
+    )
+    assert_eq(@fs.read_file(ready + ".next").binary(), original)
+    @fs.remove(ready + ".next")
+    let exported = invoke(manifest, pin, path, ["--export-to", ready])
+    exported.check()
+    assert_eq(@fs.read_file(ready).binary(), data)
+    assert_eq(@fs.read_file(path).binary(), data)
+    assert_eq(@fs.read_file(manifest).binary(), original)
+    // A valid pin does not authorize unknown schema fields to be dropped.
+    @fs.write_file(manifest, "[\"MFLARTIFACT2\"]")
+    let bad_schema = invoke(
+      manifest,
+      hash(@fs.read_file(manifest).binary()),
+      refused,
+      [],
+    )
+    assert_true(bad_schema.exit_code() != 0)
+    assert_true(
+      (bad_schema.stdout() + bad_schema.stderr()).contains("InvalidManifest"),
+    )
+    assert_true(!@fs.exists(refused + ".mfl.lock"))
+    assert_eq(requested.length(), 7)
+    println(
+      "pinned manifest workflow verified: no-replace publication, hash-before-parse refusal, authenticated pause/resume retaining 8192 bytes, seven unique requests, stopped-origin audit/adopt/repair/export and unchanged MFL1 checkpoints",
+    )
+  })
+}

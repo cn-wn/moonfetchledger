@@ -14,13 +14,13 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
 
 - Windows: strict core tests on wasm, wasm-gc and js.
 - Ubuntu/WSL, GCC 12.5: actual native tests and actual native assembly example.
-- 23 tests per portable target, including the checked README. Generated property cases cover
+- 27 tests per portable target, including the checked README. Generated property cases cover
   129 binary sizes x 4 block sizes (516 complete reception/recovery round trips).
 - Native host adds response-range validation, preservation of unrelated/extra
   data, exclusive-lock/reopen, checkpoint preservation and retry-budget/wait-hint
   boundary tests, read-only auditing, shared/exclusive lock interaction and
-  whole-file integrity, adoption, export, repair, progress, pause and authentication
-  (51 total on native).
+  whole-file integrity, adoption, export, repair, progress, pause, authentication
+  and pinned manifests (57 total on native).
 - Coverage projection: all 128 confirmation masks for seven blocks, including
   reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
   return arrays, checkpoint preservation, restoration gate and maximum length.
@@ -80,6 +80,18 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
 - Real data assembly: 28008 bytes, one invalidated block, final SHA-256
   `dca55780e807e6b6dc5dafe53a621bf99929681551ab85bb4a27f5142e208042`.
 
+- Release manifests: 36 identity round trips spanning Int64 maximum, values above
+  2^53, Unicode, escaped controls and maximum resource length; deterministic bytes,
+  whitespace parsing, all five field types, unknown/extra fields, noncanonical or
+  overflowing lengths, invalid identities and unchanged MFL1 recovery behavior.
+  Native tests verify exact-byte pins before parsing, source preservation, new-path
+  publication conflicts, 65536/65537-byte boundaries, strict UTF-8, schema failures
+  and successful reuse after refusal. The real-data demo publishes a pinned
+  manifest, uses it for authenticated two-block pause/five-block resume and, with
+  the origin stopped, audit/reuse/adopt/local repair/export. Identity option
+  conflicts, manifest aliases in output/sidecar/export paths and tampered manifests
+  fail before network/session mutation.
+
 The default Windows machine has no MSVC SDK. Windows native execution is not
 claimed as locally verified. The official async dependency requires MSVC on Windows;
 MinGW is not a supported substitute. CI uses the Windows-2022 MSVC environment,
@@ -102,6 +114,7 @@ tests, the wasm/native real-data assembly example and the offline HTTP/disk work
 described in `recovery-demo.md`. Automation is MoonBit `.mbtx`, with dependency
 versions pinned independently in the script import headers.
 `local_storage_demo.mbtx` verifies adoption and export without a network origin.
+`manifest_demo.mbtx` verifies pinned publisher-to-consumer identity and all offline modes.
 The fixture server shuts down through a finite accept loop and an explicit stop
 request, including on Windows. Verification commands have three-minute budgets;
 CI jobs have a ten-minute ceiling and print each stage before starting it.

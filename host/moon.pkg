@@ -5,6 +5,7 @@ import {
   "moonbitlang/async/http",
   "moonbitlang/x/path",
   "moonbitlang/core/string" @strconv,
+  "moonbitlang/core/encoding/utf8",
 }
 
 import {

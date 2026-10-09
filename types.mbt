@@ -5,6 +5,7 @@
 pub suberror LedgerError {
   InvalidSpec(String)
   InvalidCheckpoint(String)
+  InvalidManifest(String)
   StaleLease
   InvalidResponse(String)
   ReadbackMismatch(Int64)
