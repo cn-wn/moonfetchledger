@@ -7,6 +7,8 @@ import {
 }
 
 // Values
+pub async fn adopt(@moonfetchledger.ObjectSpec, String, chunk_size? : Int) -> Unit
+
 pub async fn audit(@moonfetchledger.ObjectSpec, String) -> AuditReport
 
 pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int, max_attempts? : Int, retry_delay_ms? : Int, request_timeout_ms? : Int) -> DownloadReport

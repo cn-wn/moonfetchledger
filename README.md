@@ -20,6 +20,8 @@ fixed-block coverage rather than trusting file length or a downloaded-byte count
   version, representation and storage errors still fail immediately.
 - Offline native audit and deterministic JSON reports: actual disk readback,
   corrupt/missing block detection, coalesced gap planning and final integrity check.
+- Verified local-file adoption: bounded storage indexing, whole-digest gating,
+  new recovery checkpoint and later selective repair without changing original bytes.
 
 Core targets: wasm, wasm-gc, JavaScript and native. Host and actual validation
 boundaries are recorded in `docs/validation.md`.
@@ -57,6 +59,8 @@ See [bounded retry behavior](docs/retry.md) for CLI options, supported failures
 and explicit wait-hint limitations.
 Use [offline audit](docs/audit.md) to inspect retained files without downloading
 or rewriting them: `cmd/fetch -- --audit` with the same required identity options.
+Use [local adoption](docs/local-storage.md) to register an existing file with
+`--adopt`. Run `moon run scripts/local_storage_demo.mbtx` for a real-data example.
 
 ## Integration contract
 

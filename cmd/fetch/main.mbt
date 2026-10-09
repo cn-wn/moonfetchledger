@@ -32,6 +32,7 @@ async fn run() -> Unit {
   let args = @env.args()
   let values : Map[String, String] = Map([])
   let mut auditing = false
+  let mut adopting = false
   for i = 1; i < args.length(); {
     let flag = args[i]
     if flag == "--" {
@@ -44,6 +45,9 @@ async fn run() -> Unit {
       println(
         "Add --audit to inspect an existing session offline and emit MFLAUDIT1 JSON; download options are rejected in audit mode.",
       )
+      println(
+        "Add --adopt to verify an existing local file and create its recovery checkpoint; only --chunk-size is accepted in addition to identity options.",
+      )
       return
     }
     if flag == "--audit" {
@@ -51,6 +55,13 @@ async fn run() -> Unit {
         fail("duplicate option: --audit")
       }
       auditing = true
+      continue i + 1
+    }
+    if flag == "--adopt" {
+      if adopting {
+        fail("duplicate option: --adopt")
+      }
+      adopting = true
       continue i + 1
     }
     if ![
@@ -71,6 +82,25 @@ async fn run() -> Unit {
     argument(values, "--etag"),
     argument(values, "--sha256"),
   )
+  if adopting {
+    if auditing {
+      fail("--adopt and --audit are mutually exclusive")
+    }
+    for key, _ in values {
+      if ![
+          "--url", "--output", "--length", "--etag", "--sha256", "--chunk-size",
+        ].contains(key) {
+        fail("download option \{key} is unsupported with --adopt")
+      }
+    }
+    @host.adopt(
+      spec,
+      argument(values, "--output"),
+      chunk_size=small(values, "--chunk-size", 65536),
+    )
+    println("adopted: confirmed=\{spec.length}")
+    return
+  }
   if auditing {
     for key, _ in values {
       if !["--url", "--output", "--length", "--etag", "--sha256"].contains(key) {

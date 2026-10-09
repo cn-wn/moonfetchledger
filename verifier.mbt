@@ -17,9 +17,14 @@ pub fn Session::verifier(self : Session) -> Verifier raise LedgerError {
   if confirmed != self.spec.length {
     raise Incomplete(self.spec.length - confirmed)
   }
+  Verifier::new(self.spec, self.chunk_size)
+}
+
+///|
+fn Verifier::new(spec : ObjectSpec, chunk_size : Int) -> Verifier {
   {
-    spec: self.spec,
-    chunk_size: self.chunk_size,
+    spec,
+    chunk_size,
     hasher: @crypto.SHA256::new(),
     position: 0L,
     result: None,

@@ -78,6 +78,14 @@ pub fn Session::unconfirmed_ranges(Self) -> Array[ByteRange] raise LedgerError
 pub fn Session::verifier(Self) -> Verifier raise LedgerError
 pub fn Session::verify_complete(Self, (ByteRange) -> Bytes raise) -> Unit raise
 
+pub struct StorageIndexer {
+  // private fields
+}
+pub fn StorageIndexer::finish(Self) -> Session raise LedgerError
+pub fn StorageIndexer::new(ObjectSpec, chunk_size? : Int) -> Self raise LedgerError
+pub fn StorageIndexer::next_range(Self) -> ByteRange?
+pub fn StorageIndexer::push(Self, Bytes) -> Unit raise LedgerError
+
 pub struct Verifier {
   // private fields
 }

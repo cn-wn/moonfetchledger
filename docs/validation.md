@@ -14,12 +14,12 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
 
 - Windows: strict core tests on wasm, wasm-gc and js.
 - Ubuntu/WSL, GCC 12.5: actual native tests and actual native assembly example.
-- 16 tests per portable target, including the checked README. Generated property cases cover
+- 20 tests per portable target, including the checked README. Generated property cases cover
   129 binary sizes x 4 block sizes (516 complete reception/recovery round trips).
 - Native host adds response-range validation, preservation of unrelated/extra
   data, exclusive-lock/reopen, checkpoint preservation and retry-budget/wait-hint
   boundary tests, read-only auditing, shared/exclusive lock interaction and
-  whole-file integrity (25 total on native).
+  whole-file integrity and local adoption (32 total on native).
 - Coverage projection: all 128 confirmation masks for seven blocks, including
   reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
   return arrays, checkpoint preservation, restoration gate and maximum length.
@@ -36,6 +36,13 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
   and preserve output/checkpoint/lock bytes. Complete audit verifies SHA-256 and
   emits an empty gap list. Native tests cover truncated/absent files, absent empty
   output, bad final hash, wrong identity, malformed schema and extra-data refusal.
+- Storage indexing: 516 binary size/block-size combinations produce byte-identical
+  reception checkpoints, survive restoration and pass full-digest verification.
+  Short reads are correctable; incomplete/wrong/empty-wrong digests expose no session.
+- Native local adoption: original-file preservation, empty file, competing locks,
+  bad digest and lengths, existing checkpoint/temporary refusal and later recovery.
+  The real-data local demo adopts the 28008-byte snapshot, reuses it without
+  fetching and detects a later damaged block while preserving the checkpoint.
 - Truncated checkpoints, malformed/unknown data, cancellation, foreign leases,
   rejected responses, failed readback, missing/corrupt blocks and final digests.
 - Real data assembly: 28008 bytes, one invalidated block, final SHA-256
@@ -62,6 +69,7 @@ That script checks formatting/interface drift, strict checks, actual four-target
 tests, the wasm/native real-data assembly example and the offline HTTP/disk workflow
 described in `recovery-demo.md`. Automation is MoonBit `.mbtx`, with dependency
 versions pinned independently in the script import headers.
+`local_storage_demo.mbtx` verifies local-file adoption without a network origin.
 The fixture server shuts down through a finite accept loop and an explicit stop
 request, including on Windows. Verification commands have three-minute budgets;
 CI jobs have a ten-minute ceiling and print each stage before starting it.

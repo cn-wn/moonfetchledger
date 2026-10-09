@@ -37,6 +37,9 @@ response/version validation, crash-state reconciliation and integrity checks.
   host.audit inspects retained disk files without network or content writes and
   requires whole-file SHA-256 success before reporting completion. Its report
   serializes sizes/offsets as decimal strings, independently of checkpoint schema.
+- StorageIndexer.new/next_range/push/finish admits existing complete storage only
+  after the trusted whole digest matches. host.adopt creates a new checkpoint
+  for a regular local file without HTTP metadata fabrication or source writes.
 
 The generated interface files are the exact API source of truth. Session changes
 must be serialized; parallel leases do not provide OS-thread synchronization.
@@ -67,6 +70,7 @@ the demo serves the bundled public-domain USGS snapshot over loopback.
   target tests, native host/CLI, offline selective-repair workflow, bounded block
   retries for transient HTTP status and request timeout, read-only disk audit
   with coalesced gap reporting and deterministic JSON export.
+- Implemented: verified local-file indexing/adoption and offline cached-file reuse.
 - Planned: cancellation reporting informed by real clients; authenticated
   release-manifest integrations.
 - Planned: independent browser storage adapter with the same receive contract;
