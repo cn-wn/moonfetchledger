@@ -40,6 +40,9 @@ response/version validation, crash-state reconciliation and integrity checks.
 - StorageIndexer.new/next_range/push/finish admits existing complete storage only
   after the trusted whole digest matches. host.adopt creates a new checkpoint
   for a regular local file without HTTP metadata fabrication or source writes.
+- host.export_verified copies only complete reconciled coverage, checks the digest
+  during copy and after synced destination readback, and publishes to a new path
+  without replacing existing files. The source session remains available.
 
 The generated interface files are the exact API source of truth. Session changes
 must be serialized; parallel leases do not provide OS-thread synchronization.
@@ -71,6 +74,8 @@ the demo serves the bundled public-domain USGS snapshot over loopback.
   retries for transient HTTP status and request timeout, read-only disk audit
   with coalesced gap reporting and deterministic JSON export.
 - Implemented: verified local-file indexing/adoption and offline cached-file reuse.
+- Implemented: verified export from complete retained artifacts to a new consumer
+  path with failure cleanup and no-replacement publication.
 - Planned: cancellation reporting informed by real clients; authenticated
   release-manifest integrations.
 - Planned: independent browser storage adapter with the same receive contract;

@@ -22,6 +22,8 @@ fixed-block coverage rather than trusting file length or a downloaded-byte count
   corrupt/missing block detection, coalesced gap planning and final integrity check.
 - Verified local-file adoption: bounded storage indexing, whole-digest gating,
   new recovery checkpoint and later selective repair without changing original bytes.
+- Verified export to a new ready-to-use path: source reconciliation, copied-byte
+  SHA-256, synced destination readback and publication without replacing files.
 
 Core targets: wasm, wasm-gc, JavaScript and native. Host and actual validation
 boundaries are recorded in `docs/validation.md`.
@@ -61,6 +63,8 @@ Use [offline audit](docs/audit.md) to inspect retained files without downloading
 or rewriting them: `cmd/fetch -- --audit` with the same required identity options.
 Use [local adoption](docs/local-storage.md) to register an existing file with
 `--adopt`. Run `moon run scripts/local_storage_demo.mbtx` for a real-data example.
+Use [verified export](docs/export.md) with `--export-to NEW_PATH` to deliver a
+complete artifact while retaining its recovery session.
 
 ## Integration contract
 

@@ -2,7 +2,7 @@
 
 No implementation was copied from the comparison projects.
 
-- `moonbitlang/x@0.5.5`: SHA-256, Apache-2.0;
+- `moonbitlang/x@0.5.5`: SHA-256 and platform path utilities, Apache-2.0;
   https://github.com/moonbitlang/x . Dependency source is not vendored.
 - `moonbitlang/async@0.21.3`: host I/O, Apache-2.0;
   https://github.com/moonbitlang/async . Source is not vendored.

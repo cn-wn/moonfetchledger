@@ -48,6 +48,9 @@ async fn run() -> Unit {
       println(
         "Add --adopt to verify an existing local file and create its recovery checkpoint; only --chunk-size is accepted in addition to identity options.",
       )
+      println(
+        "Add --export-to NEW_PATH to copy a complete verified session to a new file; source and sidecars are retained, download options are rejected.",
+      )
       return
     }
     if flag == "--audit" {
@@ -67,6 +70,7 @@ async fn run() -> Unit {
     if ![
         "--url", "--output", "--length", "--etag", "--sha256", "--chunk-size", "--parallel",
         "--stop-after-blocks", "--max-attempts", "--retry-delay-ms", "--request-timeout-ms",
+        "--export-to",
       ].contains(flag) {
       fail("unknown option: \{flag}; use --help")
     }
@@ -82,6 +86,21 @@ async fn run() -> Unit {
     argument(values, "--etag"),
     argument(values, "--sha256"),
   )
+  if values.get("--export-to") is Some(destination) {
+    if auditing || adopting {
+      fail("--export-to, --adopt and --audit are mutually exclusive")
+    }
+    for key, _ in values {
+      if !["--url", "--output", "--length", "--etag", "--sha256", "--export-to"].contains(
+          key,
+        ) {
+        fail("download option \{key} is unsupported with --export-to")
+      }
+    }
+    @host.export_verified(spec, argument(values, "--output"), destination)
+    println("exported: bytes=\{spec.length}")
+    return
+  }
   if adopting {
     if auditing {
       fail("--adopt and --audit are mutually exclusive")

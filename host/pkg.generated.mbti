@@ -13,6 +13,8 @@ pub async fn audit(@moonfetchledger.ObjectSpec, String) -> AuditReport
 
 pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int, max_attempts? : Int, retry_delay_ms? : Int, request_timeout_ms? : Int) -> DownloadReport
 
+pub async fn export_verified(@moonfetchledger.ObjectSpec, String, String) -> Unit
+
 // Errors
 pub suberror HostError {
   InvalidInput(String)

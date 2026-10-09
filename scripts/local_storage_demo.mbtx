@@ -13,7 +13,7 @@ async fn invoke(path : String, extra : Array[String]) -> @shell.Output {
     "--output", path, "--length", "28008", "--etag", "\"fixture-v1\"", "--sha256",
     "dca55780e807e6b6dc5dafe53a621bf99929681551ab85bb4a27f5142e208042",
   ]
-  if !extra.contains("--audit") {
+  if !extra.contains("--audit") && !extra.contains("--export-to") {
     args.append(["--chunk-size", "4096"])
   }
   args.append(extra)
@@ -42,6 +42,20 @@ async fn main {
   reused.check()
   assert_true(reused.stdout().contains("fetched=0 retained=28008"))
   assert_eq(@fs.read_file(path + ".mfl").binary(), checkpoint)
+  let ready = dir + "/ready.csv"
+  let exported = invoke(path, ["--export-to", ready])
+  exported.check()
+  assert_true(exported.stdout().contains("exported: bytes=28008"))
+  assert_eq(@fs.read_file(ready).binary(), data)
+  assert_eq(@fs.read_file(path).binary(), data)
+  assert_eq(@fs.read_file(path + ".mfl").binary(), checkpoint)
+  assert_true(!@fs.exists(ready + ".next"))
+  let repeated_export = invoke(path, ["--export-to", ready])
+  assert_true(repeated_export.exit_code() != 0)
+  assert_eq(@fs.read_file(ready).binary(), data)
+  let conflict = invoke(path, ["--export-to", dir + "/conflict", "--audit"])
+  assert_true(conflict.exit_code() != 0)
+  assert_true(!@fs.exists(dir + "/conflict"))
   let repeated = invoke(path, ["--adopt"])
   assert_true(repeated.exit_code() != 0)
   assert_eq(@fs.read_file(path).binary(), data)
@@ -57,7 +71,20 @@ async fn main {
     "[\"MFLAUDIT1\",false,true,\"28008\",\"23912\",[[\"0\",\"4096\"]],[[\"0\",\"4096\"]]]",
   )
   assert_eq(@fs.read_file(path + ".mfl").binary(), checkpoint)
+  let refused_path = dir + "/refused.csv"
+  let refused = invoke(path, ["--export-to", refused_path])
+  assert_true(refused.exit_code() != 0)
+  assert_true(
+    (refused.stdout() + refused.stderr()).contains("recorded block [0,4096)"),
+  )
+  assert_true(!@fs.exists(refused_path) && !@fs.exists(refused_path + ".next"))
+  assert_eq(@fs.read_file(path + ".mfl").binary(), checkpoint)
+  @fs.write_file(path, data)
+  let recovered_export = invoke(path, ["--export-to", refused_path])
+  recovered_export.check()
+  assert_eq(@fs.read_file(refused_path).binary(), data)
+  assert_eq(@fs.read_file(path + ".mfl").binary(), checkpoint)
   println(
-    "local adoption verified: original bytes retained, complete offline audit, zero-request reuse, existing-session refusal and later corruption detection",
+    "local storage workflow verified: adoption, offline audit/reuse, verified export, source preservation, destination/mode refusal, corruption rejection and successful export after restoration",
   )
 }

@@ -19,7 +19,7 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
 - Native host adds response-range validation, preservation of unrelated/extra
   data, exclusive-lock/reopen, checkpoint preservation and retry-budget/wait-hint
   boundary tests, read-only auditing, shared/exclusive lock interaction and
-  whole-file integrity and local adoption (32 total on native).
+  whole-file integrity, local adoption and verified export (36 total on native).
 - Coverage projection: all 128 confirmation masks for seven blocks, including
   reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
   return arrays, checkpoint preservation, restoration gate and maximum length.
@@ -43,6 +43,13 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
   bad digest and lengths, existing checkpoint/temporary refusal and later recovery.
   The real-data local demo adopts the 28008-byte snapshot, reuses it without
   fetching and detects a later damaged block while preserving the checkpoint.
+- Export: full-byte equality and preservation of source/sidecars, empty artifact,
+  incomplete/corrupt/extra/truncated source refusal, wrong final digest and schema,
+  source lock exclusion, reserved path aliases and existing temporary preservation.
+  Publication tests inject a writer failure and a destination created during copy;
+  failures retain the other owner's file and remove only owned temporary data.
+  End-to-end export verifies real data, conflicting-mode rejection, corruption
+  refusal and successful retry after the fixture's original bytes are restored.
 - Truncated checkpoints, malformed/unknown data, cancellation, foreign leases,
   rejected responses, failed readback, missing/corrupt blocks and final digests.
 - Real data assembly: 28008 bytes, one invalidated block, final SHA-256
@@ -69,7 +76,7 @@ That script checks formatting/interface drift, strict checks, actual four-target
 tests, the wasm/native real-data assembly example and the offline HTTP/disk workflow
 described in `recovery-demo.md`. Automation is MoonBit `.mbtx`, with dependency
 versions pinned independently in the script import headers.
-`local_storage_demo.mbtx` verifies local-file adoption without a network origin.
+`local_storage_demo.mbtx` verifies adoption and export without a network origin.
 The fixture server shuts down through a finite accept loop and an explicit stop
 request, including on Windows. Verification commands have three-minute budgets;
 CI jobs have a ten-minute ceiling and print each stage before starting it.

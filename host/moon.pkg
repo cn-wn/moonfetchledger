@@ -3,6 +3,7 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/fs",
   "moonbitlang/async/http",
+  "moonbitlang/x/path",
   "moonbitlang/core/string" @strconv,
 }
 
