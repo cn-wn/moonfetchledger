@@ -43,6 +43,9 @@ response/version validation, crash-state reconciliation and integrity checks.
 - host.export_verified copies only complete reconciled coverage, checks the digest
   during copy and after synced destination readback, and publishes to a new path
   without replacing existing files. The source session remains available.
+- StorageIndexer.prepare_repair admits local block copies only after whole-source
+  verification. host.repair_from_local retains valid target coverage and repairs
+  missing/damaged blocks from a complete backup without network requests.
 
 The generated interface files are the exact API source of truth. Session changes
 must be serialized; parallel leases do not provide OS-thread synchronization.
@@ -76,6 +79,8 @@ the demo serves the bundled public-domain USGS snapshot over loopback.
 - Implemented: verified local-file indexing/adoption and offline cached-file reuse.
 - Implemented: verified export from complete retained artifacts to a new consumer
   path with failure cleanup and no-replacement publication.
+- Implemented: offline local-backup repair with source revalidation, readback,
+  selective copying and durable per-block recovery checkpoints.
 - Planned: cancellation reporting informed by real clients; authenticated
   release-manifest integrations.
 - Planned: independent browser storage adapter with the same receive contract;

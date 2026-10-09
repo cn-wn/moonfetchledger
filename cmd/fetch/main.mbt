@@ -51,6 +51,9 @@ async fn run() -> Unit {
       println(
         "Add --export-to NEW_PATH to copy a complete verified session to a new file; source and sidecars are retained, download options are rejected.",
       )
+      println(
+        "Add --repair-from BACKUP to repair an existing session offline using a fully verified local file; download options are rejected.",
+      )
       return
     }
     if flag == "--audit" {
@@ -70,7 +73,7 @@ async fn run() -> Unit {
     if ![
         "--url", "--output", "--length", "--etag", "--sha256", "--chunk-size", "--parallel",
         "--stop-after-blocks", "--max-attempts", "--retry-delay-ms", "--request-timeout-ms",
-        "--export-to",
+        "--export-to", "--repair-from",
       ].contains(flag) {
       fail("unknown option: \{flag}; use --help")
     }
@@ -86,6 +89,29 @@ async fn run() -> Unit {
     argument(values, "--etag"),
     argument(values, "--sha256"),
   )
+  if values.get("--repair-from") is Some(backup) {
+    if auditing || adopting || values.contains("--export-to") {
+      fail(
+        "--repair-from, --export-to, --adopt and --audit are mutually exclusive",
+      )
+    }
+    for key, _ in values {
+      if ![
+          "--url", "--output", "--length", "--etag", "--sha256", "--repair-from",
+        ].contains(key) {
+        fail("download option \{key} is unsupported with --repair-from")
+      }
+    }
+    let report = @host.repair_from_local(
+      spec,
+      argument(values, "--output"),
+      backup,
+    )
+    println(
+      "repaired: confirmed=\{report.confirmed_bytes} copied=\{report.repaired_blocks} retained=\{report.recovery.retained_bytes} invalidated=\{report.recovery.invalidated.length()}",
+    )
+    return
+  }
   if values.get("--export-to") is Some(destination) {
     if auditing || adopting {
       fail("--export-to, --adopt and --audit are mutually exclusive")

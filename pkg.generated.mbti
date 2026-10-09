@@ -84,6 +84,7 @@ pub struct StorageIndexer {
 pub fn StorageIndexer::finish(Self) -> Session raise LedgerError
 pub fn StorageIndexer::new(ObjectSpec, chunk_size? : Int) -> Self raise LedgerError
 pub fn StorageIndexer::next_range(Self) -> ByteRange?
+pub fn StorageIndexer::prepare_repair(Self, Session, Lease, Bytes) -> PreparedChunk raise LedgerError
 pub fn StorageIndexer::push(Self, Bytes) -> Unit raise LedgerError
 
 pub struct Verifier {

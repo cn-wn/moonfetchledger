@@ -13,7 +13,9 @@ async fn invoke(path : String, extra : Array[String]) -> @shell.Output {
     "--output", path, "--length", "28008", "--etag", "\"fixture-v1\"", "--sha256",
     "dca55780e807e6b6dc5dafe53a621bf99929681551ab85bb4a27f5142e208042",
   ]
-  if !extra.contains("--audit") && !extra.contains("--export-to") {
+  if !extra.contains("--audit") &&
+    !extra.contains("--export-to") &&
+    !extra.contains("--repair-from") {
     args.append(["--chunk-size", "4096"])
   }
   args.append(extra)
@@ -79,12 +81,24 @@ async fn main {
   )
   assert_true(!@fs.exists(refused_path) && !@fs.exists(refused_path + ".next"))
   assert_eq(@fs.read_file(path + ".mfl").binary(), checkpoint)
-  @fs.write_file(path, data)
+  let backup = dir + "/backup.csv"
+  @fs.write_file(backup, data)
+  let repaired = invoke(path, ["--repair-from", backup])
+  repaired.check()
+  assert_true(
+    repaired.stdout().contains("copied=1 retained=23912 invalidated=1"),
+  )
+  assert_eq(@fs.read_file(path).binary(), data)
+  assert_eq(@fs.read_file(backup).binary(), data)
+  let repeated_repair = invoke(path, ["--repair-from", backup])
+  repeated_repair.check()
+  assert_true(repeated_repair.stdout().contains("copied=0 retained=28008"))
+  let checkpoint = @fs.read_file(path + ".mfl").binary()
   let recovered_export = invoke(path, ["--export-to", refused_path])
   recovered_export.check()
   assert_eq(@fs.read_file(refused_path).binary(), data)
   assert_eq(@fs.read_file(path + ".mfl").binary(), checkpoint)
   println(
-    "local storage workflow verified: adoption, offline audit/reuse, verified export, source preservation, destination/mode refusal, corruption rejection and successful export after restoration",
+    "local storage workflow verified: adoption, audit/reuse, verified export, refusal, offline selective repair from trusted backup and repeat repair with zero copies",
   )
 }

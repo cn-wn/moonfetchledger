@@ -14,12 +14,12 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
 
 - Windows: strict core tests on wasm, wasm-gc and js.
 - Ubuntu/WSL, GCC 12.5: actual native tests and actual native assembly example.
-- 20 tests per portable target, including the checked README. Generated property cases cover
+- 22 tests per portable target, including the checked README. Generated property cases cover
   129 binary sizes x 4 block sizes (516 complete reception/recovery round trips).
 - Native host adds response-range validation, preservation of unrelated/extra
   data, exclusive-lock/reopen, checkpoint preservation and retry-budget/wait-hint
   boundary tests, read-only auditing, shared/exclusive lock interaction and
-  whole-file integrity, local adoption and verified export (36 total on native).
+  whole-file integrity, local adoption, export and local repair (41 total on native).
 - Coverage projection: all 128 confirmation masks for seven blocks, including
   reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
   return arrays, checkpoint preservation, restoration gate and maximum length.
@@ -50,6 +50,11 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
   failures retain the other owner's file and remove only owned temporary data.
   End-to-end export verifies real data, conflicting-mode rejection, corruption
   refusal and successful retry after the fixture's original bytes are restored.
+- Local repair: 260 size/layout combinations yield identical indexed checkpoints;
+  incomplete/untrusted source, changed reads, wrong layout/identity, foreign leases,
+  truncation/absent target, empty data, extra data and temporary ownership refusal.
+  The USGS workflow repairs one block offline, retains 23912 bytes, then repeats
+  with zero copies and exports the repaired artifact.
 - Truncated checkpoints, malformed/unknown data, cancellation, foreign leases,
   rejected responses, failed readback, missing/corrupt blocks and final digests.
 - Real data assembly: 28008 bytes, one invalidated block, final SHA-256

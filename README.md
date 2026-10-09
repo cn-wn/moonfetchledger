@@ -24,6 +24,8 @@ fixed-block coverage rather than trusting file length or a downloaded-byte count
   new recovery checkpoint and later selective repair without changing original bytes.
 - Verified export to a new ready-to-use path: source reconciliation, copied-byte
   SHA-256, synced destination readback and publication without replacing files.
+- Offline selective repair from a fully verified local backup: preserve correct
+  target blocks, reject changed backup reads, checkpoint every repaired block.
 
 Core targets: wasm, wasm-gc, JavaScript and native. Host and actual validation
 boundaries are recorded in `docs/validation.md`.
@@ -65,6 +67,8 @@ Use [local adoption](docs/local-storage.md) to register an existing file with
 `--adopt`. Run `moon run scripts/local_storage_demo.mbtx` for a real-data example.
 Use [verified export](docs/export.md) with `--export-to NEW_PATH` to deliver a
 complete artifact while retaining its recovery session.
+Use [offline local repair](docs/local-repair.md) with `--repair-from BACKUP` when
+the origin is unavailable and a complete trusted copy exists locally.
 
 ## Integration contract
 

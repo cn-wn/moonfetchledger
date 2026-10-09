@@ -55,3 +55,38 @@ pub fn StorageIndexer::finish(
   result.search_start = result.blocks.length()
   result
 }
+
+///|
+/// Prepare a local repair from an entirely verified storage index. Identity and
+/// block layout must match the target. Re-read bytes must still match the indexed
+/// block digest; rejected input leaves the lease available for a corrected read.
+pub fn StorageIndexer::prepare_repair(
+  self : StorageIndexer,
+  target : Session,
+  lease : Lease,
+  bytes : Bytes,
+) -> PreparedChunk raise LedgerError {
+  self.verifier.finish()
+  target.check_lease(lease)
+  if target.spec != self.session.spec ||
+    target.chunk_size != self.session.chunk_size {
+    raise InvalidSpec(
+      "repair source identity and block layout must match target",
+    )
+  }
+  if bytes.length().to_int64() != lease.range.length() {
+    raise InvalidResponse(
+      "local repair read does not match reserved block length",
+    )
+  }
+  let sha256 = digest(bytes)
+  match target.blocks[lease.index] {
+    Confirmed(_, old) if old != sha256 =>
+      raise InvalidResponse("conflicting local repair duplicate block")
+    _ => ()
+  }
+  match self.session.blocks[lease.index] {
+    Confirmed(_, expected) if expected == sha256 => { lease, sha256, }
+    _ => raise InvalidResponse("local repair source changed since verification")
+  }
+}
