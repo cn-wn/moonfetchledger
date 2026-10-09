@@ -69,6 +69,7 @@ async fn receive(
 /// An optional block budget performs a controlled pause, returning complete=false.
 /// Await on_progress serially after saved recovery/blocks and at the final phase.
 /// Callback errors propagate without retrying notification or reverting saved data.
+/// pause_signal stops new batches; the current batch drains and saves normally.
 pub async fn download(
   spec : @ledger.ObjectSpec,
   output : String,
@@ -79,6 +80,7 @@ pub async fn download(
   retry_delay_ms? : Int = 200,
   request_timeout_ms? : Int = 30000,
   on_progress? : async (DownloadProgress) -> Unit,
+  pause_signal? : @ledger.PauseSignal,
 ) -> DownloadReport {
   if max_attempts < 1 ||
     max_attempts > 8 ||
@@ -158,7 +160,8 @@ pub async fn download(
   let mutex = @async.Mutex::Mutex()
   let mut downloaded = 0
   let budget = stop_after_blocks.unwrap_or(100000)
-  while downloaded < budget {
+  while downloaded < budget &&
+        !(pause_signal is Some(signal) && signal.is_requested()) {
     let jobs : Array[async () -> Unit] = []
     for _ in 0..<parallel.min(budget - downloaded) {
       if session.reserve_missing() is Some(lease) {

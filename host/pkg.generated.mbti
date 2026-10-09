@@ -11,7 +11,7 @@ pub async fn adopt(@moonfetchledger.ObjectSpec, String, chunk_size? : Int) -> Un
 
 pub async fn audit(@moonfetchledger.ObjectSpec, String) -> AuditReport
 
-pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int, max_attempts? : Int, retry_delay_ms? : Int, request_timeout_ms? : Int, on_progress? : async (DownloadProgress) -> Unit) -> DownloadReport
+pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int, max_attempts? : Int, retry_delay_ms? : Int, request_timeout_ms? : Int, on_progress? : async (DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> DownloadReport
 
 pub async fn export_verified(@moonfetchledger.ObjectSpec, String, String) -> Unit
 

@@ -28,6 +28,8 @@ fixed-block coverage rather than trusting file length or a downloaded-byte count
   target blocks, reject changed backup reads, checkpoint every repaired block.
 - Serialized asynchronous download progress after saved coverage, with verified
   completion events and opt-in deterministic CLI JSON lines.
+- Cooperative pause intent: drain the current batch, save it, return resumable
+  incomplete coverage and resume with a fresh signal without refetching valid blocks.
 
 Core targets: wasm, wasm-gc, JavaScript and native. Host and actual validation
 boundaries are recorded in `docs/validation.md`.
@@ -73,6 +75,8 @@ Use [offline local repair](docs/local-repair.md) with `--repair-from BACKUP` whe
 the origin is unavailable and a complete trusted copy exists locally.
 Use [download progress](docs/progress.md) via `on_progress` or CLI `--progress`
 to observe saved blocks, pauses and verified completion.
+Use [controlled pause](docs/pause.md) for application-driven pause/resume;
+`moon run --target native examples/controlled` demonstrates it with real data.
 
 ## Integration contract
 

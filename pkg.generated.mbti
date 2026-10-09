@@ -49,6 +49,13 @@ pub fn ObjectSpec::new(String, Int64, String, String) -> Self raise LedgerError
 pub fn ObjectSpec::not_equal(Self, Self) -> Bool
 pub fn ObjectSpec::to_repr(Self) -> @debug.Repr
 
+pub struct PauseSignal {
+  // private fields
+}
+pub fn PauseSignal::is_requested(Self) -> Bool
+pub fn PauseSignal::new() -> Self
+pub fn PauseSignal::request_pause(Self) -> Unit
+
 pub struct PreparedChunk {
   // private fields
 }

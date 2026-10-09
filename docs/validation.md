@@ -14,12 +14,12 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
 
 - Windows: strict core tests on wasm, wasm-gc and js.
 - Ubuntu/WSL, GCC 12.5: actual native tests and actual native assembly example.
-- 22 tests per portable target, including the checked README. Generated property cases cover
+- 23 tests per portable target, including the checked README. Generated property cases cover
   129 binary sizes x 4 block sizes (516 complete reception/recovery round trips).
 - Native host adds response-range validation, preservation of unrelated/extra
   data, exclusive-lock/reopen, checkpoint preservation and retry-budget/wait-hint
   boundary tests, read-only auditing, shared/exclusive lock interaction and
-  whole-file integrity, local adoption, export, repair and progress (44 total on native).
+  whole-file integrity, local adoption, export, repair, progress and pause (48 total on native).
 - Coverage projection: all 128 confirmation masks for seven blocks, including
   reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
   return arrays, checkpoint preservation, restoration gate and maximum length.
@@ -60,6 +60,11 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
   Tests cover initial failure, zero-budget pause, empty completion and no Complete
   event on bad whole digest. The real-data CLI verifies monotonic counts/JSON
   round trips during reverse arrivals, five-block repair and zero-fetch reopen.
+- Controlled pause: independent/idempotent signals, pre-requested and Recovered
+  requests, batch draining, resume retaining six bytes and requesting only two
+  remaining blocks, empty completion and fatal version errors after a pause.
+  The real-data controlled example drains three blocks, retains 12288 bytes and
+  fetches four remaining blocks before full verification and zero-fetch reopen.
 - Truncated checkpoints, malformed/unknown data, cancellation, foreign leases,
   rejected responses, failed readback, missing/corrupt blocks and final digests.
 - Real data assembly: 28008 bytes, one invalidated block, final SHA-256

@@ -85,8 +85,9 @@ the demo serves the bundled public-domain USGS snapshot over loopback.
 - Implemented: offline local-backup repair with source revalidation, readback,
   selective copying and durable per-block recovery checkpoints.
 - Implemented: serialized download progress and callback-error restart behavior.
-- Planned: cancellation reporting informed by real clients; authenticated
-  release-manifest integrations.
+- Implemented: cooperative pause intent, draining current batches and resuming
+  saved coverage, with completion taking precedence and errors still propagating.
+- Planned: authenticated release-manifest integrations.
 - Planned: independent browser storage adapter with the same receive contract;
   versioned checkpoint migrations only when a concrete schema extension is needed.
 

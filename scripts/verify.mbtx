@@ -48,6 +48,7 @@ async fn main {
   checked(["run", "--target", "native", "examples/assemble"])
   checked(["run", "scripts/recovery_demo.mbtx"])
   checked(["run", "scripts/local_storage_demo.mbtx"])
+  checked(["run", "--target", "native", "examples/controlled"])
   println(
     "verified formatting, interfaces, four core targets, real-data assembly and HTTP/disk recovery",
   )

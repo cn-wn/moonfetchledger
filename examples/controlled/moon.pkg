@@ -1,0 +1,15 @@
+import {
+  "cn-wn/moonfetchledger" @ledger,
+  "cn-wn/moonfetchledger/host",
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/http",
+  "moonbitlang/async/socket",
+  "moonbitlang/core/string" @strconv,
+}
+
+pkgtype(kind: "executable")
+
+options(
+  supported_targets: "native",
+)
