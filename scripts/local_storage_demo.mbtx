@@ -36,6 +36,9 @@ async fn main {
   let checkpoint = @fs.read_file(path + ".mfl").binary()
   let audit = invoke(path, ["--audit"])
   audit.check()
+  let invalid_progress = invoke(path, ["--audit", "--progress"])
+  assert_true(invalid_progress.exit_code() != 0)
+  assert_eq(@fs.read_file(path + ".mfl").binary(), checkpoint)
   assert_eq(
     @json.parse(audit.stdout().trim()).stringify(),
     "[\"MFLAUDIT1\",true,true,\"28008\",\"28008\",[],[]]",

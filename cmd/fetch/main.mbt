@@ -33,6 +33,7 @@ async fn run() -> Unit {
   let values : Map[String, String] = Map([])
   let mut auditing = false
   let mut adopting = false
+  let mut progress = false
   for i = 1; i < args.length(); {
     let flag = args[i]
     if flag == "--" {
@@ -54,6 +55,9 @@ async fn run() -> Unit {
       println(
         "Add --repair-from BACKUP to repair an existing session offline using a fully verified local file; download options are rejected.",
       )
+      println(
+        "Add --progress to emit MFLPROGRESS1 JSON lines during downloads, followed by the normal summary.",
+      )
       return
     }
     if flag == "--audit" {
@@ -68,6 +72,13 @@ async fn run() -> Unit {
         fail("duplicate option: --adopt")
       }
       adopting = true
+      continue i + 1
+    }
+    if flag == "--progress" {
+      if progress {
+        fail("duplicate option: --progress")
+      }
+      progress = true
       continue i + 1
     }
     if ![
@@ -89,6 +100,15 @@ async fn run() -> Unit {
     argument(values, "--etag"),
     argument(values, "--sha256"),
   )
+  if progress &&
+    (
+      auditing ||
+      adopting ||
+      values.contains("--export-to") ||
+      values.contains("--repair-from")
+    ) {
+    fail("--progress is supported only for downloads")
+  }
   if values.get("--repair-from") is Some(backup) {
     if auditing || adopting || values.contains("--export-to") {
       fail(
@@ -166,6 +186,7 @@ async fn run() -> Unit {
     max_attempts=small(values, "--max-attempts", 1),
     retry_delay_ms=small(values, "--retry-delay-ms", 200),
     request_timeout_ms=small(values, "--request-timeout-ms", 30000),
+    on_progress=event => if progress { println(event.to_json().stringify()) },
   )
   println(
     "\{if report.complete { "complete" } else { "paused" }}: confirmed=\{report.confirmed_bytes} fetched=\{report.downloaded_blocks} retained=\{report.recovery.retained_bytes} invalidated=\{report.recovery.invalidated.length()}",

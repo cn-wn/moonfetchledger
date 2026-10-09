@@ -11,7 +11,7 @@ pub async fn adopt(@moonfetchledger.ObjectSpec, String, chunk_size? : Int) -> Un
 
 pub async fn audit(@moonfetchledger.ObjectSpec, String) -> AuditReport
 
-pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int, max_attempts? : Int, retry_delay_ms? : Int, request_timeout_ms? : Int) -> DownloadReport
+pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int, max_attempts? : Int, retry_delay_ms? : Int, request_timeout_ms? : Int, on_progress? : async (DownloadProgress) -> Unit) -> DownloadReport
 
 pub async fn export_verified(@moonfetchledger.ObjectSpec, String, String) -> Unit
 
@@ -38,6 +38,23 @@ pub struct AuditReport {
 } derive(@debug.Debug)
 pub fn AuditReport::to_json(Self) -> Json
 pub fn AuditReport::to_repr(Self) -> @debug.Repr
+
+pub enum DownloadPhase {
+  Recovered
+  BlockCommitted(@moonfetchledger.ByteRange)
+  Paused
+  Complete
+} derive(@debug.Debug)
+pub fn DownloadPhase::to_repr(Self) -> @debug.Repr
+
+pub struct DownloadProgress {
+  phase : DownloadPhase
+  total_bytes : Int64
+  confirmed_bytes : Int64
+  downloaded_blocks : Int
+} derive(@debug.Debug)
+pub fn DownloadProgress::to_json(Self) -> Json
+pub fn DownloadProgress::to_repr(Self) -> @debug.Repr
 
 pub struct DownloadReport {
   complete : Bool

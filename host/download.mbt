@@ -37,6 +37,7 @@ async fn receive(
   attempts : Int,
   delay : Int,
   timeout : Int,
+  progress : ProgressTracker,
 ) -> Unit {
   let bytes = fetch(session.spec, lease, attempts, delay, timeout)
   let prepared = session.prepare_chunk(
@@ -57,6 +58,8 @@ async fn receive(
   defer mutex.release()
   session.commit_written(prepared, readback)
   save(session, checkpoint)
+  progress.downloaded += 1
+  progress.notify(session, BlockCommitted(lease.range))
 }
 
 ///|
@@ -64,6 +67,8 @@ async fn receive(
 /// form a single session. Retain all three when restarting. File locks coordinate
 /// cooperating processes only; use a trusted directory with no external writers.
 /// An optional block budget performs a controlled pause, returning complete=false.
+/// Await on_progress serially after saved recovery/blocks and at the final phase.
+/// Callback errors propagate without retrying notification or reverting saved data.
 pub async fn download(
   spec : @ledger.ObjectSpec,
   output : String,
@@ -73,6 +78,7 @@ pub async fn download(
   max_attempts? : Int = 1,
   retry_delay_ms? : Int = 200,
   request_timeout_ms? : Int = 30000,
+  on_progress? : async (DownloadProgress) -> Unit,
 ) -> DownloadReport {
   if max_attempts < 1 ||
     max_attempts > 8 ||
@@ -147,6 +153,8 @@ pub async fn download(
     invalidated,
   }
   save(session, checkpoint)
+  let progress : ProgressTracker = { callback: on_progress, downloaded: 0, }
+  progress.notify(session, Recovered)
   let mutex = @async.Mutex::Mutex()
   let mut downloaded = 0
   let budget = stop_after_blocks.unwrap_or(100000)
@@ -157,7 +165,7 @@ pub async fn download(
         jobs.push(() => {
           receive(
             session, lease, file, mutex, checkpoint, max_attempts, retry_delay_ms,
-            request_timeout_ms,
+            request_timeout_ms, progress,
           )
         })
       }
@@ -181,6 +189,7 @@ pub async fn download(
       raise InvalidResponse("output length changed during verification")
     }
   }
+  progress.notify(session, if complete { Complete } else { Paused })
   {
     complete,
     confirmed_bytes: session.confirmed_bytes(),

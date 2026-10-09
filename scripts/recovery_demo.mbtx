@@ -118,8 +118,11 @@ async fn main {
       }
     })
     let path = dir + "/earthquakes.csv"
-    let first = invoke(url + "/data", path, ["--stop-after-blocks", "3"])
+    let first = invoke(url + "/data", path, [
+      "--stop-after-blocks", "3", "--progress",
+    ])
     first.check()
+    check_progress(first.stdout(), 0L, 3, "paused")
     reverse_first = false
     assert_true(first.stdout().contains("paused: confirmed=12288 fetched=3"))
     assert_eq(requested.length(), 3)
@@ -159,8 +162,9 @@ async fn main {
     assert_true(!@fs.exists(path + ".mfl.next"))
     requested.clear()
     completed.clear()
-    let second = invoke(url + "/data", path, [])
+    let second = invoke(url + "/data", path, ["--progress"])
     second.check()
+    check_progress(second.stdout(), 8192L, 5, "complete")
     assert_true(
       second
       .stdout()
@@ -182,8 +186,9 @@ async fn main {
       "[\"MFLAUDIT1\",true,true,\"28008\",\"28008\",[],[]]",
     )
     assert_eq(@fs.read_file(path + ".mfl").text(), checkpoint)
-    let third = invoke(url + "/data", path, [])
+    let third = invoke(url + "/data", path, ["--progress"])
     third.check()
+    check_progress(third.stdout(), 28008L, 0, "complete")
     assert_eq(requested.length(), 0)
     assert_eq(@fs.read_file(path + ".mfl").text(), checkpoint)
     let retry_path = dir + "/retry.csv"
@@ -245,7 +250,61 @@ async fn main {
     println(first.stdout().trim())
     println(second.stdout().trim())
     println(
-      "offline HTTP/disk recovery verified: read-only deterministic audit, reverse arrivals, selective refill, stable checkpoint, fatal version refusal, 503/429 retries, bounded exhaustion/restart and timeout recovery",
+      "offline HTTP/disk recovery verified: saved monotonic JSON progress, read-only deterministic audit, reverse arrivals, selective refill, stable checkpoint, fatal version refusal, 503/429 retries, bounded exhaustion/restart and timeout recovery",
     )
   })
+}
+
+///|
+fn check_progress(
+  text : String,
+  retained : Int64,
+  blocks : Int,
+  final_phase : String,
+) -> Unit raise {
+  let mut seen = 0
+  let mut confirmed = retained
+  let mut copied = 0
+  for line in text.split("\n") {
+    if !line.has_prefix("[\"MFLPROGRESS1\"") {
+      continue
+    }
+    let event = @json.parse(line)
+    assert_eq(@json.parse(event.stringify()), event)
+    match event {
+      [
+        "MFLPROGRESS1",
+        String(phase),
+        "28008",
+        String(bytes),
+        String(count),
+        range,
+      ] => {
+        if seen == 0 {
+          assert_eq(phase, "recovered")
+          assert_eq(range, Json::null())
+        } else if seen <= blocks {
+          assert_eq(phase, "block")
+          match range {
+            [String(start), String(end)] => {
+              let start = @strconv.parse_int64(start)
+              let end = @strconv.parse_int64(end)
+              assert_true(start % 4096L == 0L && end > start && end <= 28008L)
+              confirmed += end - start
+              copied += 1
+            }
+            _ => fail("invalid progress block range")
+          }
+        } else {
+          assert_eq(phase, final_phase)
+          assert_eq(range, Json::null())
+        }
+        assert_eq(@strconv.parse_int64(bytes), confirmed)
+        assert_eq(@strconv.parse_int(count), copied)
+      }
+      _ => fail("invalid progress event schema")
+    }
+    seen += 1
+  }
+  assert_eq(seen, blocks + 2)
 }

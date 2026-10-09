@@ -7,6 +7,10 @@ import {
   "moonbitlang/core/string" @strconv,
 }
 
+import {
+  "moonbitlang/async/socket",
+} for "test"
+
 options(
   supported_targets: "native",
 )

@@ -26,6 +26,8 @@ fixed-block coverage rather than trusting file length or a downloaded-byte count
   SHA-256, synced destination readback and publication without replacing files.
 - Offline selective repair from a fully verified local backup: preserve correct
   target blocks, reject changed backup reads, checkpoint every repaired block.
+- Serialized asynchronous download progress after saved coverage, with verified
+  completion events and opt-in deterministic CLI JSON lines.
 
 Core targets: wasm, wasm-gc, JavaScript and native. Host and actual validation
 boundaries are recorded in `docs/validation.md`.
@@ -69,6 +71,8 @@ Use [verified export](docs/export.md) with `--export-to NEW_PATH` to deliver a
 complete artifact while retaining its recovery session.
 Use [offline local repair](docs/local-repair.md) with `--repair-from BACKUP` when
 the origin is unavailable and a complete trusted copy exists locally.
+Use [download progress](docs/progress.md) via `on_progress` or CLI `--progress`
+to observe saved blocks, pauses and verified completion.
 
 ## Integration contract
 

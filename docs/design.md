@@ -46,6 +46,9 @@ response/version validation, crash-state reconciliation and integrity checks.
 - StorageIndexer.prepare_repair admits local block copies only after whole-source
   verification. host.repair_from_local retains valid target coverage and repairs
   missing/damaged blocks from a complete backup without network requests.
+- host.download's optional on_progress observer receives saved recovery/block
+  snapshots and pause/verified completion events. Observer failures preserve saved
+  progress for restart; the CLI can emit deterministic MFLPROGRESS1 JSON lines.
 
 The generated interface files are the exact API source of truth. Session changes
 must be serialized; parallel leases do not provide OS-thread synchronization.
@@ -81,6 +84,7 @@ the demo serves the bundled public-domain USGS snapshot over loopback.
   path with failure cleanup and no-replacement publication.
 - Implemented: offline local-backup repair with source revalidation, readback,
   selective copying and durable per-block recovery checkpoints.
+- Implemented: serialized download progress and callback-error restart behavior.
 - Planned: cancellation reporting informed by real clients; authenticated
   release-manifest integrations.
 - Planned: independent browser storage adapter with the same receive contract;

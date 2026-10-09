@@ -19,7 +19,7 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
 - Native host adds response-range validation, preservation of unrelated/extra
   data, exclusive-lock/reopen, checkpoint preservation and retry-budget/wait-hint
   boundary tests, read-only auditing, shared/exclusive lock interaction and
-  whole-file integrity, local adoption, export and local repair (41 total on native).
+  whole-file integrity, local adoption, export, repair and progress (44 total on native).
 - Coverage projection: all 128 confirmation masks for seven blocks, including
   reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
   return arrays, checkpoint preservation, restoration gate and maximum length.
@@ -55,6 +55,11 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
   truncation/absent target, empty data, extra data and temporary ownership refusal.
   The USGS workflow repairs one block offline, retains 23912 bytes, then repeats
   with zero copies and exports the repaired artifact.
+- Progress: saved coverage is readable inside callbacks; first-block callback
+  failure releases the lock and restart fetches only the remaining two blocks.
+  Tests cover initial failure, zero-budget pause, empty completion and no Complete
+  event on bad whole digest. The real-data CLI verifies monotonic counts/JSON
+  round trips during reverse arrivals, five-block repair and zero-fetch reopen.
 - Truncated checkpoints, malformed/unknown data, cancellation, foreign leases,
   rejected responses, failed readback, missing/corrupt blocks and final digests.
 - Real data assembly: 28008 bytes, one invalidated block, final SHA-256
