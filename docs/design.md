@@ -60,9 +60,10 @@ the demo serves the bundled public-domain USGS snapshot over loopback.
 ## Coherent capability roadmap
 
 - Implemented: object-bound sparse receipt and storage reconciliation, all core
-  target tests, native host/CLI, offline selective-repair workflow.
-- Planned: configurable retry/backoff and cancellation reporting informed by
-  real clients; authenticated release-manifest integrations.
+  target tests, native host/CLI, offline selective-repair workflow, bounded block
+  retries for transient HTTP status and request timeout.
+- Planned: cancellation reporting informed by real clients; authenticated
+  release-manifest integrations.
 - Planned: independent browser storage adapter with the same receive contract;
   versioned checkpoint migrations only when a concrete schema extension is needed.
 

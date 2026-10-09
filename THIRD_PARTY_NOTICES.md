@@ -9,7 +9,8 @@ No implementation was copied from the comparison projects.
 - MoonBit core/scaffold: https://github.com/moonbitlang/core , Apache-2.0.
   Root LICENSE was supplied by `moon new`.
 - Protocol reference: https://www.rfc-editor.org/rfc/rfc9110.html , sections
-  8.8, 13.1.5, 14. No RFC prose or code was copied.
+  8.8, 10.2.3, 13.1.5, 14; 429 semantics:
+  https://www.rfc-editor.org/rfc/rfc6585.html#section-4 . No RFC prose or code was copied.
 - Standard SHA-256 empty/abc test vectors:
   https://csrc.nist.gov/projects/cryptographic-algorithm-validation-program/secure-hashing .
   Other binary test cases are project-authored deterministic data.

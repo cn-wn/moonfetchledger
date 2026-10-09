@@ -4,6 +4,7 @@ pub suberror HostError {
   InvalidResponse(String)
   CheckpointTooLarge
   OutputLocked
+  RetryExhausted(@ledger.ByteRange, Int, String)
 } derive(Debug)
 
 ///|
@@ -33,8 +34,11 @@ async fn receive(
   file : @fs.File,
   mutex : @async.Mutex,
   checkpoint : String,
+  attempts : Int,
+  delay : Int,
+  timeout : Int,
 ) -> Unit {
-  let bytes = fetch(session.spec, lease)
+  let bytes = fetch(session.spec, lease, attempts, delay, timeout)
   let prepared = session.prepare_chunk(
     lease,
     bytes,
@@ -66,7 +70,20 @@ pub async fn download(
   chunk_size? : Int = 65536,
   parallel? : Int = 4,
   stop_after_blocks? : Int,
+  max_attempts? : Int = 1,
+  retry_delay_ms? : Int = 200,
+  request_timeout_ms? : Int = 30000,
 ) -> DownloadReport {
+  if max_attempts < 1 ||
+    max_attempts > 8 ||
+    retry_delay_ms < 0 ||
+    retry_delay_ms > 30000 ||
+    request_timeout_ms < 1 ||
+    request_timeout_ms > 120000 {
+    raise InvalidInput(
+      "attempts must be 1..8; retry delay 0..30000 ms; request timeout 1..120000 ms",
+    )
+  }
   if output.is_empty() ||
     parallel < 1 ||
     parallel > 16 ||
@@ -137,7 +154,12 @@ pub async fn download(
     let jobs : Array[async () -> Unit] = []
     for _ in 0..<parallel.min(budget - downloaded) {
       if session.reserve_missing() is Some(lease) {
-        jobs.push(() => receive(session, lease, file, mutex, checkpoint))
+        jobs.push(() => {
+          receive(
+            session, lease, file, mutex, checkpoint, max_attempts, retry_delay_ms,
+            request_timeout_ms,
+          )
+        })
       }
     }
     if jobs.is_empty() {

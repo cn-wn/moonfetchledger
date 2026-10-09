@@ -38,13 +38,13 @@ async fn run() -> Unit {
     }
     if flag == "--help" {
       println(
-        "fetch --url URL --output PATH --length N --etag QUOTED_ETAG --sha256 HEX [--chunk-size N] [--parallel 1..16] [--stop-after-blocks N]",
+        "fetch --url URL --output PATH --length N --etag QUOTED_ETAG --sha256 HEX [--chunk-size N] [--parallel 1..16] [--stop-after-blocks N] [--max-attempts 1..8] [--retry-delay-ms 0..30000] [--request-timeout-ms 1..120000]",
       )
       return
     }
     if ![
         "--url", "--output", "--length", "--etag", "--sha256", "--chunk-size", "--parallel",
-        "--stop-after-blocks",
+        "--stop-after-blocks", "--max-attempts", "--retry-delay-ms", "--request-timeout-ms",
       ].contains(flag) {
       fail("unknown option: \{flag}; use --help")
     }
@@ -66,6 +66,9 @@ async fn run() -> Unit {
     chunk_size=small(values, "--chunk-size", 65536),
     parallel=small(values, "--parallel", 4),
     stop_after_blocks=small(values, "--stop-after-blocks", 100000),
+    max_attempts=small(values, "--max-attempts", 1),
+    retry_delay_ms=small(values, "--retry-delay-ms", 200),
+    request_timeout_ms=small(values, "--request-timeout-ms", 30000),
   )
   println(
     "\{if report.complete { "complete" } else { "paused" }}: confirmed=\{report.confirmed_bytes} fetched=\{report.downloaded_blocks} retained=\{report.recovery.retained_bytes} invalidated=\{report.recovery.invalidated.length()}",

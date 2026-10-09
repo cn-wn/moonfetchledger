@@ -34,6 +34,9 @@ async fn main {
   let completed : Array[Int] = []
   let mut reject_once = true
   let mut reverse_first = true
+  let mut transient = 0
+  let mut exhaust = true
+  let mut timeout_once = true
   @async.with_task_group(group => {
     let server = @http.Server::Server(@socket.Addr::parse("127.0.0.1:0"))
     defer server.close()
@@ -61,6 +64,32 @@ async fn main {
           assert_true(start >= 0 && end <= data.length() && end > start)
           let index = start / 4096
           requested.push(index)
+          if request.path == "/transient" && index == 0 && transient < 2 {
+            transient += 1
+            conn.send_response(
+              if transient == 1 {
+                503
+              } else {
+                429
+              },
+              "Temporary",
+              extra_headers={ "Retry-After": "0", "Connection": "close" },
+            )
+            conn.end_response()
+            return
+          }
+          if request.path == "/exhaust" && exhaust {
+            conn.send_response(503, "Unavailable", extra_headers={
+              "Retry-After": "0",
+              "Connection": "close",
+            })
+            conn.end_response()
+            return
+          }
+          if request.path == "/timeout" && timeout_once {
+            timeout_once = false
+            @async.sleep(1000)
+          }
           let bad = request.path == "/retry" && reject_once
           if bad {
             reject_once = false
@@ -125,7 +154,10 @@ async fn main {
     assert_eq(requested.length(), 0)
     assert_eq(@fs.read_file(path + ".mfl").text(), checkpoint)
     let retry_path = dir + "/retry.csv"
-    let refused = invoke(url + "/retry", retry_path, ["--parallel", "1"])
+    requested.clear()
+    let refused = invoke(url + "/retry", retry_path, [
+      "--parallel", "1", "--max-attempts", "3",
+    ])
     assert_true(refused.exit_code() != 0)
     assert_true(
       (refused.stdout() + refused.stderr()).contains(
@@ -133,16 +165,54 @@ async fn main {
       ),
     )
     assert_eq(@fs.file_size(retry_path), 0L)
+    assert_eq(requested.length(), 1)
     let retry = invoke(url + "/retry", retry_path, ["--parallel", "1"])
     retry.check()
     assert_eq(@fs.read_file(retry_path).binary(), data)
+    requested.clear()
+    let transient_path = dir + "/transient.csv"
+    let recovered = invoke(url + "/transient", transient_path, [
+      "--parallel", "1", "--max-attempts", "3", "--retry-delay-ms", "0",
+    ])
+    recovered.check()
+    assert_eq(requested.length(), 9)
+    assert_true(recovered.stdout().contains("fetched=7"))
+    assert_eq(@fs.read_file(transient_path).binary(), data)
+    requested.clear()
+    let exhausted_path = dir + "/exhausted.csv"
+    let exhausted = invoke(url + "/exhaust", exhausted_path, [
+      "--parallel", "1", "--max-attempts", "3", "--retry-delay-ms", "0",
+    ])
+    assert_true(exhausted.exit_code() != 0)
+    assert_true(
+      (exhausted.stdout() + exhausted.stderr()).contains("RetryExhausted"),
+    )
+    assert_eq(requested.length(), 3)
+    assert_eq(@fs.file_size(exhausted_path), 0L)
+    match @json.parse(@fs.read_file(exhausted_path + ".mfl").text()) {
+      [_, _, _, _, _, _, Array(records)] => assert_eq(records.length(), 0)
+      _ => fail("invalid exhausted checkpoint")
+    }
+    exhaust = false
+    let restarted = invoke(url + "/exhaust", exhausted_path, [])
+    restarted.check()
+    assert_eq(@fs.read_file(exhausted_path).binary(), data)
+    requested.clear()
+    let timeout_path = dir + "/timeout.csv"
+    let timed = invoke(url + "/timeout", timeout_path, [
+      "--parallel", "1", "--max-attempts", "2", "--retry-delay-ms", "0", "--request-timeout-ms",
+      "250",
+    ])
+    timed.check()
+    assert_eq(requested.length(), 8)
+    assert_eq(@fs.read_file(timeout_path).binary(), data)
     let (stopped, _) = @http.get(url + "/__stop")
     assert_eq(stopped.code, 200)
     serving.wait()
     println(first.stdout().trim())
     println(second.stdout().trim())
     println(
-      "offline HTTP/disk recovery verified: reverse arrivals, independent processes, selective refill, stable checkpoint, bad-response refusal and retry",
+      "offline HTTP/disk recovery verified: reverse arrivals, selective refill, stable checkpoint, fatal version refusal, 503/429 retries, bounded exhaustion/restart and timeout recovery",
     )
   })
 }

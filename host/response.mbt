@@ -40,8 +40,48 @@ fn content_range(text : String) -> (@ledger.ByteRange, Int64) raise {
 }
 
 ///|
-async fn fetch(spec : @ledger.ObjectSpec, lease : @ledger.Lease) -> Bytes {
-  @async.with_timeout(30000, () => {
+priv enum FetchResult {
+  Payload(Bytes)
+  Retry(String, Int)
+}
+
+///|
+fn retry_delay(header : String?, fallback : Int) -> Int raise HostError {
+  match header {
+    None => fallback
+    Some(text) => {
+      if text.is_empty() || text.length() > 8 {
+        raise InvalidResponse(
+          "Retry-After requires decimal seconds in 0..30; HTTP-date unsupported",
+        )
+      }
+      let mut seconds = 0
+      for c in text {
+        if c < '0' || c > '9' {
+          raise InvalidResponse(
+            "Retry-After requires decimal seconds; HTTP-date unsupported",
+          )
+        }
+        seconds = seconds * 10 + c.to_int() - '0'.to_int()
+        if seconds > 30 {
+          raise InvalidResponse(
+            "Retry-After exceeds the 30 second wait limit; restart later",
+          )
+        }
+      }
+      fallback.max(seconds * 1000)
+    }
+  }
+}
+
+///|
+async fn fetch_once(
+  spec : @ledger.ObjectSpec,
+  lease : @ledger.Lease,
+  timeout : Int,
+  delay : Int,
+) -> FetchResult {
+  @async.with_timeout(timeout, () => {
     let requested = lease.range
     let (response, client) = @http.get_stream(spec.resource, headers={
       "Range": "bytes=\{requested.start}-\{requested.end - 1L}",
@@ -49,6 +89,12 @@ async fn fetch(spec : @ledger.ObjectSpec, lease : @ledger.Lease) -> Bytes {
       "Accept-Encoding": "identity",
     })
     defer client.close()
+    if response.code == 429 || response.code == 503 {
+      return Retry(
+        "HTTP \{response.code}",
+        retry_delay(response.headers.get("Retry-After"), delay),
+      )
+    }
     if response.code != 206 {
       raise InvalidResponse(
         "expected 206, got \{response.code}; retain files and restart explicitly",
@@ -73,6 +119,32 @@ async fn fetch(spec : @ledger.ObjectSpec, lease : @ledger.Lease) -> Bytes {
     if client.read_some(max_len=1) is Some(_) {
       raise InvalidResponse("response body contains extra bytes")
     }
-    bytes
-  })
+    Payload(bytes)
+  }) catch {
+    @async.TimeoutError => Retry("request timeout", delay)
+    other => raise other
+  }
+}
+
+///|
+// Only requests are retried. Storage writes and ledger commits happen once,
+// outside this loop, after the response has passed every representation check.
+async fn fetch(
+  spec : @ledger.ObjectSpec,
+  lease : @ledger.Lease,
+  attempts : Int,
+  delay : Int,
+  timeout : Int,
+) -> Bytes {
+  for attempt = 1; ; attempt = attempt + 1 {
+    match fetch_once(spec, lease, timeout, delay) {
+      Payload(bytes) => return bytes
+      Retry(reason, wait) => {
+        if attempt == attempts {
+          raise RetryExhausted(lease.range, attempt, reason)
+        }
+        @async.sleep(wait)
+      }
+    }
+  }
 }

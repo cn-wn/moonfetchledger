@@ -32,6 +32,46 @@ async test "input refusal preserves unrelated files and old checkpoints" {
 }
 
 ///|
+async test "invalid retry budgets refuse before creating any files" {
+  let dir = @fs.tmpdir(prefix="moonfetchledger-policy-")
+  defer @fs.rmdir(dir, recursive=true)
+  let path = dir + "/object"
+  let spec = @ledger.ObjectSpec::new(
+    "http://127.0.0.1:1/object",
+    0L,
+    "\"v1\"",
+    @ledger.digest(b""),
+  )
+  for
+    (attempts, delay, timeout) in [
+      (0, 0, 1),
+      (9, 0, 1),
+      (1, -1, 1),
+      (1, 30001, 1),
+      (1, 0, 0),
+      (1, 0, 120001),
+    ] {
+    try
+      @host.download(
+        spec,
+        path,
+        max_attempts=attempts,
+        retry_delay_ms=delay,
+        request_timeout_ms=timeout,
+      )
+    catch {
+      @host.InvalidInput(_) => ()
+      _ => fail("incorrect policy diagnostic")
+    } noraise {
+      _ => fail("accepted invalid retry budget")
+    }
+    assert_true(!@fs.exists(path))
+    assert_true(!@fs.exists(path + ".mfl"))
+    assert_true(!@fs.exists(path + ".mfl.lock"))
+  }
+}
+
+///|
 async test "native file lock rejects a competing writer and permits later recovery" {
   let dir = @fs.tmpdir(prefix="moonfetchledger-lock-")
   defer @fs.rmdir(dir, recursive=true)

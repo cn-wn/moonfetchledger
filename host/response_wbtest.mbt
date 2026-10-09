@@ -21,3 +21,22 @@ test "strict response Content-Range and inclusive overflow boundaries" {
     }
   }
 }
+
+///|
+test "Retry-After delay is bounded and unsupported forms fail explicitly" {
+  assert_eq(retry_delay(None, 200), 200)
+  assert_eq(retry_delay(Some("0"), 200), 200)
+  assert_eq(retry_delay(Some("0002"), 200), 2000)
+  assert_eq(retry_delay(Some("30"), 0), 30000)
+  for
+    bad in [
+      "", "31", "2147483647", "-1", "1.5", "1,2", " 1", "1 ", "Fri, 31 Dec 1999 23:59:59 GMT",
+    ] {
+    try retry_delay(Some(bad), 0) catch {
+      InvalidResponse(_) => ()
+      _ => fail("incorrect Retry-After diagnostic")
+    } noraise {
+      _ => fail("accepted unsupported Retry-After: \{bad}")
+    }
+  }
+}

@@ -7,7 +7,7 @@ import {
 }
 
 // Values
-pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int) -> DownloadReport
+pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int, max_attempts? : Int, retry_delay_ms? : Int, request_timeout_ms? : Int) -> DownloadReport
 
 // Errors
 pub suberror HostError {
@@ -15,6 +15,7 @@ pub suberror HostError {
   InvalidResponse(String)
   CheckpointTooLarge
   OutputLocked
+  RetryExhausted(@moonfetchledger.ByteRange, Int, String)
 } derive(@debug.Debug)
 pub fn HostError::to_repr(Self) -> @debug.Repr
 

@@ -17,11 +17,16 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
 - 14 tests per target, including the checked README. Generated property cases cover
   129 binary sizes x 4 block sizes (516 complete reception/recovery round trips).
 - Native host adds response-range validation, preservation of unrelated/extra
-  data, exclusive-lock/reopen and checkpoint preservation tests (18 total on native).
+  data, exclusive-lock/reopen, checkpoint preservation and retry-budget/wait-hint
+  boundary tests (20 total on native).
 - Offline actual HTTP/disk workflow passed on Linux: reverse arrival order,
   separate paused/resumed processes, 8192 retained bytes, one invalidated block,
   exactly five repair requests, full-byte equality, no requests on complete reopen,
   rejected changed ETag and successful subsequent retry.
+- Bounded retry scenarios: 503 then 429 then valid 206, exactly nine requests for
+  seven committed blocks; three-attempt exhaustion with zero written bytes and
+  empty coverage followed by successful restart; timed-out request then successful
+  retry; changed ETag still refused after one request with retries enabled.
 - Truncated checkpoints, malformed/unknown data, cancellation, foreign leases,
   rejected responses, failed readback, missing/corrupt blocks and final digests.
 - Real data assembly: 28008 bytes, one invalidated block, final SHA-256

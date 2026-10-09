@@ -16,6 +16,8 @@ fixed-block coverage rather than trusting file length or a downloaded-byte count
   objects. Int64 offsets never pass through floating-point serialization.
 - Native HTTP/filesystem adapter and generic CLI: cooperative file lock, bounded
   parallel requests, synced write/readback, replace-on-save checkpoints and repair.
+- Opt-in bounded retries for 429/503 and request timeouts, with validated wait hints;
+  version, representation and storage errors still fail immediately.
 
 Core targets: wasm, wasm-gc, JavaScript and native. Host and actual validation
 boundaries are recorded in `docs/validation.md`.
@@ -49,6 +51,8 @@ The offline demo serves the bundled data, pauses, damages a confirmed disk block
 retains correct blocks, refetches only missing/damaged blocks and verifies all
 final bytes. It also tests bad-response refusal and successful retry. See
 [the end-to-end workflow](docs/recovery-demo.md) for commands and exact boundaries.
+See [bounded retry behavior](docs/retry.md) for CLI options, supported failures
+and explicit wait-hint limitations.
 
 ## Integration contract
 
@@ -92,7 +96,7 @@ This is a complementary receive/storage-state layer, not a replacement HTTP stac
 model hub, tus upload protocol or content-deduplication engine. We make no claim
 of ecosystem uniqueness or performance superiority. API review: `docs/ecosystem.md`.
 
-Planned: retry/backoff, authenticated manifest integration and a browser storage
+Planned: authenticated manifest integration and a browser storage
 adapter, driven by downstream needs. [Design and roadmap](docs/design.md).
 
 Apache-2.0. Data/dependency sources: `THIRD_PARTY_NOTICES.md`.
