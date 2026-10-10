@@ -32,6 +32,7 @@ async fn run() -> Unit {
   let args = @env.args()
   let values : Map[String, String] = Map([])
   let mut auditing = false
+  let mut recovering_checkpoint = false
   let mut adopting = false
   let mut progress = false
   let mut loopback_auth = false
@@ -49,6 +50,9 @@ async fn run() -> Unit {
       )
       println(
         "Add --audit to inspect an existing session offline and emit MFLAUDIT1 JSON; download options are rejected in audit mode.",
+      )
+      println(
+        "Add --recover-checkpoint to validate and promote an interrupted .mfl.next save offline; preserve valid recorded coverage and emit MFLAUDIT1 JSON. Download options and other modes are rejected.",
       )
       println(
         "Add --adopt to verify an existing local file and create its recovery checkpoint; only --chunk-size is accepted in addition to identity options.",
@@ -72,6 +76,13 @@ async fn run() -> Unit {
         fail("duplicate option: --audit")
       }
       auditing = true
+      continue i + 1
+    }
+    if flag == "--recover-checkpoint" {
+      if recovering_checkpoint {
+        fail("duplicate option: --recover-checkpoint")
+      }
+      recovering_checkpoint = true
       continue i + 1
     }
     if flag == "--adopt" {
@@ -111,7 +122,11 @@ async fn run() -> Unit {
   }
   let spec = specification(values)
   if values.get("--write-manifest") is Some(destination) {
-    if auditing || adopting || progress || loopback_auth {
+    if auditing ||
+      adopting ||
+      progress ||
+      loopback_auth ||
+      recovering_checkpoint {
       fail(
         "--write-manifest accepts only inline identity and a new destination",
       )
@@ -127,6 +142,27 @@ async fn run() -> Unit {
     }
     let pin = @host.write_manifest(spec, destination)
     println("manifest: sha256=\{pin}")
+    return
+  }
+  if recovering_checkpoint {
+    if auditing ||
+      adopting ||
+      progress ||
+      loopback_auth ||
+      values.contains("--export-to") ||
+      values.contains("--repair-from") {
+      fail("--recover-checkpoint is an exclusive offline mode")
+    }
+    for key, _ in values {
+      if !identity_option(key) {
+        fail("option \{key} is unsupported with --recover-checkpoint")
+      }
+    }
+    println(
+      @host.recover_checkpoint(spec, argument(values, "--output"))
+      .to_json()
+      .stringify(),
+    )
     return
   }
   if loopback_auth &&

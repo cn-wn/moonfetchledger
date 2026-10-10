@@ -22,7 +22,9 @@ pub async fn adopt(
     raise OutputLocked
   }
   let checkpoint = output + ".mfl"
-  if @fs.exists(checkpoint) || @fs.exists(checkpoint + ".next") {
+  if @fs.exists(checkpoint) ||
+    @fs.exists(checkpoint + ".next") ||
+    @fs.exists(checkpoint + ".recovering") {
     raise InvalidInput(
       "adopt requires a new checkpoint; existing session/temporary data must be retained",
     )

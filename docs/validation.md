@@ -1,4 +1,4 @@
-# Validation record — 2026-10-09
+# Validation record — 2026-10-10
 
 Stable download channel binaries match the local version:
 
@@ -19,8 +19,8 @@ The isolated Linux toolchain reports the same compiler/build-tool versions.
 - Native host adds response-range validation, preservation of unrelated/extra
   data, exclusive-lock/reopen, checkpoint preservation and retry-budget/wait-hint
   boundary tests, read-only auditing, shared/exclusive lock interaction and
-  whole-file integrity, adoption, export, repair, progress, pause, authentication
-  and pinned manifests (57 total on native).
+  whole-file integrity, adoption, export, repair, progress, pause, authentication,
+  pinned manifests and interrupted checkpoint recovery (63 total on native).
 - Coverage projection: all 128 confirmation masks for seven blocks, including
   reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
   return arrays, checkpoint preservation, restoration gate and maximum length.
@@ -98,6 +98,15 @@ MinGW is not a supported substitute. CI uses the Windows-2022 MSVC environment,
 plus Linux and macOS. CI status must be checked after pushing; configuration alone
 is not evidence of success.
 
+Checkpoint-save recovery tests cover all 64 installed/candidate coverage-mask pairs,
+monotonic actual coverage, sorted/deduplicated failed records, absent storage and
+first-save recovery, malformed/schema/identity/layout/whole-digest refusal, extra
+bytes, exclusive locks, 16M-byte bounds, unrelated temporary preservation and failed
+installation cleanup. The real-data demo reconstructs an interrupted four-block
+save, promotes 16384 confirmed bytes without network or artifact writes, resumes
+only three remaining blocks, refuses stale coverage and reopens with the origin
+stopped. Pinned-manifest recovery is verified in the manifest workflow.
+
 Upstream async C stubs produced GCC's ignored-return-value warning and MSVC's
 EINVAL macro-redefinition warning; project
 MoonBit code is checked with `--deny-warn`. No dependency code was modified.
@@ -115,6 +124,7 @@ described in `recovery-demo.md`. Automation is MoonBit `.mbtx`, with dependency
 versions pinned independently in the script import headers.
 `local_storage_demo.mbtx` verifies adoption and export without a network origin.
 `manifest_demo.mbtx` verifies pinned publisher-to-consumer identity and all offline modes.
+`checkpoint_recovery_demo.mbtx` verifies interrupted checkpoint promotion and resume.
 The fixture server shuts down through a finite accept loop and an explicit stop
 request, including on Windows. Verification commands have three-minute budgets;
 CI jobs have a ten-minute ceiling and print each stage before starting it.

@@ -23,8 +23,7 @@ pub extend DownloadReport with Debug::{to_repr}
 
 ///|
 async fn save(session : @ledger.Session, checkpoint : String) -> Unit {
-  @fs.write_file(checkpoint + ".next", session.checkpoint(), sync=Full)
-  @fs.rename(checkpoint + ".next", checkpoint, replace=true)
+  replace_checkpoint(session, checkpoint, checkpoint + ".next")
 }
 
 ///|
@@ -114,6 +113,11 @@ pub async fn download(
     raise InvalidInput("chunk size must be 1..4194304 bytes")
   }
   let checkpoint = output + ".mfl"
+  if @fs.exists(checkpoint + ".next") || @fs.exists(checkpoint + ".recovering") {
+    raise InvalidInput(
+      "checkpoint temporary exists; retain it and use recover_checkpoint/--recover-checkpoint for a saved .next candidate; inspect .recovering separately",
+    )
+  }
   let lock = @fs.open(
     output + ".mfl.lock",
     mode=ReadWrite,

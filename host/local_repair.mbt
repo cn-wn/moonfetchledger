@@ -40,7 +40,7 @@ pub async fn repair_from_local(
   if !lock.try_lock(Exclusive) {
     raise OutputLocked
   }
-  if @fs.exists(checkpoint + ".next") {
+  if @fs.exists(checkpoint + ".next") || @fs.exists(checkpoint + ".recovering") {
     raise InvalidInput(
       "checkpoint temporary file exists; inspect it before repair",
     )

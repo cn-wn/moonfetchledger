@@ -1,0 +1,142 @@
+///|
+import {
+  "moonbitlang/async@0.21.3",
+  "moonbitlang/async@0.21.3/fs",
+  "moonbitlang/async@0.21.3/http",
+  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/async@0.21.3/socket",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string" @strconv,
+}
+
+///|
+async fn invoke(
+  url : String,
+  output : String,
+  extra : Array[String],
+) -> @shell.Output {
+  let args = [
+    "run", "--target", "native", "cmd/fetch", "--", "--url", url, "--output", output,
+    "--length", "28008", "--etag", "\"fixture-v1\"", "--sha256", "dca55780e807e6b6dc5dafe53a621bf99929681551ab85bb4a27f5142e208042",
+  ]
+  if !extra.contains("--recover-checkpoint") {
+    args.append(["--chunk-size", "4096", "--parallel", "1"])
+  }
+  args.append(extra)
+  @shell.Cmd("moon", args).output(timeout_ms=120000)
+}
+
+///|
+async fn main {
+  let data = @fs.read_file("fixtures/earthquakes-2024-01-01.csv").binary()
+  let dir = @fs.tmpdir(prefix="moonfetchledger-checkpoint-demo-")
+  defer @fs.rmdir(dir, recursive=true)
+  let path = dir + "/earthquakes.csv"
+  let requested : Array[Int] = []
+  @async.with_task_group(group => {
+    let server = @http.Server::Server(@socket.Addr::parse("127.0.0.1:0"))
+    defer server.close()
+    let url = "http://127.0.0.1:\{server.addr.port()}"
+    let serving = group.spawn(() => {
+      while true {
+        let (conn, _) = server.accept()
+        let request = conn.read_request()
+        if request.path == "/stop" {
+          conn.send_response(200, "OK", extra_headers={ "Connection": "close" })
+          conn.end_response()
+          conn.close()
+          break
+        }
+        group.spawn_bg(() => {
+          defer conn.close()
+          assert_eq(request.path, "/data")
+          assert_eq(request.headers.get("If-Range"), Some("\"fixture-v1\""))
+          let parts = request.headers.get("Range").unwrap()[6:]
+            .split("-")
+            .collect()
+          let start = @strconv.parse_int(parts[0])
+          let end = @strconv.parse_int(parts[1]) + 1
+          requested.push(start / 4096)
+          conn.send_response(206, "Partial Content", extra_headers={
+            "ETag": "\"fixture-v1\"",
+            "Content-Range": "bytes \{start}-\{end - 1}/28008",
+            "Connection": "close",
+          })
+          conn.write(data[start:end].to_owned())
+          conn.end_response()
+        })
+      }
+    })
+    let first = invoke(url + "/data", path, ["--stop-after-blocks", "2"])
+    first.check()
+    let older = @fs.read_file(path + ".mfl").binary()
+    let second = invoke(url + "/data", path, ["--stop-after-blocks", "2"])
+    second.check()
+    let pending = @fs.read_file(path + ".mfl").binary()
+    let partial = @fs.read_file(path).binary()
+    assert_eq(requested, [0, 1, 2, 3])
+    assert_eq(partial.length(), 16384)
+    // Reproduce the state between a saved four-block temporary and replacement
+    // of the older two-block checkpoint, using real validated checkpoints.
+    @fs.rename(path + ".mfl", path + ".mfl.next", replace=false)
+    @fs.write_file(path + ".mfl", older)
+    let refused = invoke(url + "/data", path, [])
+    assert_true(refused.exit_code() != 0)
+    assert_true(
+      (refused.stdout() + refused.stderr()).contains("--recover-checkpoint"),
+    )
+    for
+      extra in [
+        ["--recover-checkpoint", "--audit"],
+        ["--recover-checkpoint", "--progress"],
+        ["--recover-checkpoint", "--parallel", "1"],
+        ["--recover-checkpoint", "--bearer-env", "UNUSED_TOKEN"],
+        ["--recover-checkpoint", "--recover-checkpoint"],
+      ] {
+      assert_true(invoke(url + "/data", path, extra).exit_code() != 0)
+      assert_eq(@fs.read_file(path + ".mfl").binary(), older)
+      assert_eq(@fs.read_file(path + ".mfl.next").binary(), pending)
+      assert_eq(@fs.read_file(path).binary(), partial)
+    }
+    let recovered = invoke(url + "/data", path, ["--recover-checkpoint"])
+    recovered.check()
+    assert_eq(
+      @json.parse(recovered.stdout().trim()).stringify(),
+      "[\"MFLAUDIT1\",false,true,\"16384\",\"16384\",[[\"16384\",\"28008\"]],[]]",
+    )
+    assert_eq(requested, [0, 1, 2, 3])
+    assert_eq(@fs.read_file(path).binary(), partial)
+    assert_eq(@fs.read_file(path + ".mfl").binary(), pending)
+    assert_true(
+      !@fs.exists(path + ".mfl.next") && !@fs.exists(path + ".mfl.recovering"),
+    )
+    let resumed = invoke(url + "/data", path, [])
+    resumed.check()
+    assert_true(resumed.stdout().contains("fetched=3 retained=16384"))
+    assert_eq(requested, [0, 1, 2, 3, 4, 5, 6])
+    assert_eq(@fs.read_file(path).binary(), data)
+    let complete = @fs.read_file(path + ".mfl").binary()
+    @fs.write_file(path + ".mfl.next", older)
+    let stale = invoke(url + "/data", path, ["--recover-checkpoint"])
+    assert_true(stale.exit_code() != 0)
+    assert_true(
+      (stale.stdout() + stale.stderr()).contains("lose valid recorded coverage"),
+    )
+    assert_eq(@fs.read_file(path + ".mfl.next").binary(), older)
+    assert_eq(@fs.read_file(path + ".mfl").binary(), complete)
+    assert_eq(@fs.read_file(path).binary(), data)
+    // Only the stale candidate deliberately created by this test is removed.
+    @fs.remove(path + ".mfl.next")
+    let (stopped, _) = @http.get(url + "/stop")
+    assert_eq(stopped.code, 200)
+    serving.wait()
+    server.close()
+    let reused = invoke(url + "/data", path, [])
+    reused.check()
+    assert_true(reused.stdout().contains("fetched=0 retained=28008"))
+    assert_eq(@fs.read_file(path + ".mfl").binary(), complete)
+    println(
+      "interrupted checkpoint recovery verified: candidate preservation, exclusive offline mode, readback promotion retaining 16384 bytes, three-block resume, stale candidate refusal and stopped-origin zero-fetch reuse",
+    )
+  })
+}

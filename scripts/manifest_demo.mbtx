@@ -127,7 +127,7 @@ async fn main {
       assert_eq(@fs.read_file(manifest).binary(), original)
       assert_true(!@fs.exists(manifest + ".mfl.lock"))
     }
-    for suffix in [".mfl", ".mfl.lock", ".mfl.next"] {
+    for suffix in [".mfl", ".mfl.lock", ".mfl.next", ".mfl.recovering"] {
       let output = dir + "/reserved" + suffix
       let input = output + suffix
       @fs.write_file(input, original)
@@ -260,6 +260,16 @@ async fn main {
     assert_eq(@fs.read_file(ready).binary(), data)
     assert_eq(@fs.read_file(path).binary(), data)
     assert_eq(@fs.read_file(manifest).binary(), original)
+    let saved = @fs.read_file(path + ".mfl").binary()
+    @fs.write_file(path + ".mfl.next", saved)
+    let recovered = invoke(manifest, pin, path, ["--recover-checkpoint"])
+    recovered.check()
+    assert_eq(
+      @json.parse(recovered.stdout().trim()).stringify(),
+      "[\"MFLAUDIT1\",true,true,\"28008\",\"28008\",[],[]]",
+    )
+    assert_eq(@fs.read_file(path + ".mfl").binary(), saved)
+    assert_true(!@fs.exists(path + ".mfl.next"))
     // A valid pin does not authorize unknown schema fields to be dropped.
     @fs.write_file(manifest, "[\"MFLARTIFACT2\"]")
     let bad_schema = invoke(

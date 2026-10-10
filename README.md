@@ -34,6 +34,8 @@ fixed-block coverage rather than trusting file length or a downloaded-byte count
   input in the CLI and credential rotation without changing recovery identity.
 - Pinned release identity manifests: deterministic publication, hash-before-parse
   bounded loading and the same manifest for download, resume and offline operations.
+- Explicit interrupted-checkpoint recovery: preserve saved temporaries, validate
+  actual blocks and promote a candidate only without losing valid recorded coverage.
 
 Core targets: wasm, wasm-gc, JavaScript and native. Host and actual validation
 boundaries are recorded in `docs/validation.md`.
@@ -86,6 +88,9 @@ Use [authenticated download](docs/auth.md) with `--bearer-env VARIABLE_NAME`;
 Use [pinned manifests](docs/manifest.md) with `--manifest FILE --manifest-sha256 HEX`
 instead of the four inline identity arguments. `moon run scripts/manifest_demo.mbtx`
 verifies publication, authenticated resume and stopped-origin offline operations.
+Use [interrupted checkpoint recovery](docs/checkpoint-recovery.md) when `.mfl.next`
+remains after a failed save: `--recover-checkpoint` validates it offline before
+normal resume. `moon run scripts/checkpoint_recovery_demo.mbtx` demonstrates it.
 
 ## Integration contract
 

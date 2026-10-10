@@ -52,6 +52,9 @@ response/version validation, crash-state reconciliation and integrity checks.
 - ObjectSpec.to_manifest/from_manifest serialize exact release identity. Native
   write_manifest/load_manifest publish a new file and verify an independent byte
   hash before parsing. The CLI uses the pinned identity in every artifact mode.
+- host.recover_checkpoint explicitly validates interrupted .mfl.next saves against
+  disk and installed coverage, refusing stale candidates and preserving artifact
+  bytes. Checkpoint saves create their temporary files exclusively.
 
 The generated interface files are the exact API source of truth. Session changes
 must be serialized; parallel leases do not provide OS-thread synchronization.
@@ -94,6 +97,8 @@ the demo serves the bundled public-domain USGS snapshot over loopback.
   CLI credential input, rotation/resume, immediate 401/403 refusal and no redirects.
 - Implemented: pinned release identity publication/loading, strict schema and byte
   bounds, no identity overrides, download/resume and complete offline integration.
+- Implemented: interrupted checkpoint candidate recovery, monotonic valid coverage,
+  offline promotion/reporting and refusal to overwrite retained temporary files.
 - Planned: signed release metadata integration beyond independent SHA-256 pins.
 - Planned: independent browser storage adapter with the same receive contract;
   versioned checkpoint migrations only when a concrete schema extension is needed.

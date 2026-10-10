@@ -52,6 +52,7 @@ async fn protect_manifest(
       output + ".mfl",
       output + ".mfl.lock",
       output + ".mfl.next",
+      output + ".mfl.recovering",
     ])
   }
   if values.get("--export-to") is Some(destination) {

@@ -17,6 +17,8 @@ pub async fn export_verified(@moonfetchledger.ObjectSpec, String, String) -> Uni
 
 pub async fn load_manifest(String, String) -> @moonfetchledger.ObjectSpec
 
+pub async fn recover_checkpoint(@moonfetchledger.ObjectSpec, String) -> AuditReport
+
 pub async fn repair_from_local(@moonfetchledger.ObjectSpec, String, String) -> LocalRepairReport
 
 pub async fn write_manifest(@moonfetchledger.ObjectSpec, String) -> String
