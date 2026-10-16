@@ -24,7 +24,7 @@ Linux moon: `a31026b83410607909ebae469fa19e46c32201cfe403be6099e1da961a5ebf0f`.
   boundary tests, read-only auditing, shared/exclusive lock interaction and
   whole-file integrity, adoption, export, repair, progress, pause, authentication,
   pinned manifests, interrupted checkpoint recovery and source/WebDAV integration
-  (74 total on native, including the checked WebDAV usage example).
+  (79 total on native, including the checked WebDAV usage example).
 - Coverage projection: all 128 confirmation masks for seven blocks, including
   reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
   return arrays, checkpoint preservation, restoration gate and maximum length.
@@ -140,13 +140,31 @@ entry points now use bounded reads on the same handle as the size/kind checks;
 the EOF probe reads at most one additional byte. The real-data local storage demo
 also checks CLI refusal/preservation across receive, audit, local repair and export.
 
-The complete unchanged verification script passed in a Linux-local snapshot,
-with all 97 project files compared byte-for-byte against the original working
+The complete verification script passed in a Linux-local snapshot,
+with all 101 project files compared byte-for-byte against the original working
 tree before and after validation. In the Windows-mounted checkout the manifest
 workflow reached the existing 180-second subprocess budget; the Linux-local run
 kept that budget and completed all stages. Use a Linux-local checkout when a
 cross-OS mounted filesystem makes repeated CLI invocations too slow. This is an
 environment observation, not a performance claim about the library.
+
+Local repair control tests exercise 32 sparse-coverage/budget combinations,
+saved coverage inside callbacks, exact remaining-copy counts on resume,
+pre-requested/Recovered/BlockCopied pause signals, idempotent paused reopen,
+completion precedence, empty artifacts, initial/block callback failure and lock
+release. Negative budgets fail before files are opened. Invalid backup hashes
+remain fatal under zero budgets and pause intent; a backup modified by a callback
+is refused before copying. Target damage during a callback cannot emit Complete.
+The CLI's real-data demo pauses after one of two nonadjacent repairs, audits the
+remaining gap, validates JSON round trips, resumes with 23912 retained bytes,
+rejects unsupported controls without mutation, and completes a zero-budget reopen.
+Existing no-control repair behavior and MFL1 checkpoint bytes remain unchanged.
+Windows CI initially passed all 79 native tests, then exposed CRLF delimiters in
+the new CLI example's line comparison. The example now strips only the delimiter's
+single trailing CR before checking canonical JSON; both LF and CRLF are tested
+against explicit expected records. Run `moon run scripts/local_storage_demo.mbtx
+--check-progress-lines` to check this parser without a native C compiler, or omit
+the option to run the full actual-file workflow.
 
 Upstream async C stubs produced GCC's ignored-return-value warning and MSVC's
 EINVAL macro-redefinition warning; project

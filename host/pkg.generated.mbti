@@ -21,7 +21,7 @@ pub async fn receive_from(@moonfetchledger.ObjectSpec, String, fetch_range~ : as
 
 pub async fn recover_checkpoint(@moonfetchledger.ObjectSpec, String) -> AuditReport
 
-pub async fn repair_from_local(@moonfetchledger.ObjectSpec, String, String) -> LocalRepairReport
+pub async fn repair_from_local(@moonfetchledger.ObjectSpec, String, String, stop_after_blocks? : Int, on_progress? : async (LocalRepairProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> LocalRepairReport
 
 pub async fn write_manifest(@moonfetchledger.ObjectSpec, String) -> String
 
@@ -77,7 +77,25 @@ pub struct DownloadReport {
 } derive(@debug.Debug)
 pub fn DownloadReport::to_repr(Self) -> @debug.Repr
 
+pub enum LocalRepairPhase {
+  Recovered
+  BlockCopied(@moonfetchledger.ByteRange)
+  Paused
+  Complete
+} derive(@debug.Debug)
+pub fn LocalRepairPhase::to_repr(Self) -> @debug.Repr
+
+pub struct LocalRepairProgress {
+  phase : LocalRepairPhase
+  total_bytes : Int64
+  confirmed_bytes : Int64
+  repaired_blocks : Int
+} derive(@debug.Debug)
+pub fn LocalRepairProgress::to_json(Self) -> Json
+pub fn LocalRepairProgress::to_repr(Self) -> @debug.Repr
+
 pub struct LocalRepairReport {
+  complete : Bool
   confirmed_bytes : Int64
   repaired_blocks : Int
   recovery : @moonfetchledger.RecoveryReport

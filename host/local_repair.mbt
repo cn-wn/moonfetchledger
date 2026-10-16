@@ -1,5 +1,6 @@
 ///|
 pub struct LocalRepairReport {
+  complete : Bool
   confirmed_bytes : Int64
   repaired_blocks : Int32
   recovery : @ledger.RecoveryReport
@@ -13,11 +14,21 @@ pub extend LocalRepairReport with Debug::{to_repr}
 /// Verify the backup before any target writes, then revalidate each copied block,
 /// sync/read back and save coverage. Retain valid blocks and never trim extra data.
 /// Failure can leave durable partial progress; restart with the same identity.
+/// Backup verification always finishes before copying or pause handling. A block
+/// budget or pause signal stops between saved blocks. Callbacks are serialized,
+/// describe durable progress, and propagate errors without undoing saved work.
+/// Complete is reported only after target whole-file verification.
 pub async fn repair_from_local(
   spec : @ledger.ObjectSpec,
   output : String,
   backup : String,
+  stop_after_blocks? : Int32,
+  on_progress? : async (LocalRepairProgress) -> Unit,
+  pause_signal? : @ledger.PauseSignal,
 ) -> LocalRepairReport {
+  if stop_after_blocks is Some(limit) && limit < 0 {
+    raise InvalidInput("local repair block budget must be nonnegative")
+  }
   let checkpoint = output + ".mfl"
   if output.is_empty() ||
     backup.is_empty() ||
@@ -89,8 +100,15 @@ pub async fn repair_from_local(
     invalidated,
   }
   save(session, checkpoint)
-  let mut repaired_blocks = 0
-  while session.reserve_missing() is Some(lease) {
+  let tracker : LocalRepairTracker = { callback: on_progress, copied: 0, }
+  tracker.notify(session, Recovered)
+  let budget = stop_after_blocks.unwrap_or(100000)
+  while tracker.copied < budget &&
+        !(pause_signal is Some(signal) && signal.is_requested()) {
+    let lease = match session.reserve_missing() {
+      Some(lease) => lease
+      None => break
+    }
     let bytes = source.read_exactly_at(
       lease.range.length().to_int(),
       position=lease.range.start,
@@ -103,17 +121,29 @@ pub async fn repair_from_local(
       target.read_exactly_at(bytes.length(), position=lease.range.start),
     )
     save(session, checkpoint)
-    repaired_blocks += 1
+    tracker.copied += 1
+    tracker.notify(session, BlockCopied(lease.range))
   }
-  let verifier = session.verifier()
-  while verifier.next_range() is Some(range) {
-    verifier.push(
-      target.read_exactly_at(range.length().to_int(), position=range.start),
-    )
+  let complete = session.confirmed_bytes() == spec.length
+  if complete {
+    let verifier = session.verifier()
+    while verifier.next_range() is Some(range) {
+      verifier.push(
+        target.read_exactly_at(range.length().to_int(), position=range.start),
+      )
+    }
+    verifier.finish()
   }
-  verifier.finish()
-  if target.size() != spec.length || source.size() != spec.length {
+  if target.size() > spec.length ||
+    (complete && target.size() != spec.length) ||
+    source.size() != spec.length {
     raise InvalidInput("target or backup length changed during repair")
   }
-  { confirmed_bytes: session.confirmed_bytes(), repaired_blocks, recovery, }
+  tracker.notify(session, if complete { Complete } else { Paused })
+  {
+    complete,
+    confirmed_bytes: session.confirmed_bytes(),
+    repaired_blocks: tracker.copied,
+    recovery,
+  }
 }

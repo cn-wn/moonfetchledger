@@ -61,10 +61,10 @@ async fn run() -> Unit {
         "Add --export-to NEW_PATH to copy a complete verified session to a new file; source and sidecars are retained, download options are rejected.",
       )
       println(
-        "Add --repair-from BACKUP to repair an existing session offline using a fully verified local file; download options are rejected.",
+        "Add --repair-from BACKUP to repair an existing session offline using a fully verified local file; --stop-after-blocks N and --progress are supported, other download options are rejected.",
       )
       println(
-        "Add --progress to emit MFLPROGRESS1 JSON lines during downloads, followed by the normal summary.",
+        "Add --progress to emit MFLPROGRESS1 JSON lines during downloads or MFLREPAIR1 during local repair, followed by the normal summary.",
       )
       println(
         "Add --bearer-env NAME to read a transient Bearer token from an environment variable; HTTPS required. --allow-loopback-auth permits only 127.0.0.1 HTTP for local testing.",
@@ -175,14 +175,8 @@ async fn run() -> Unit {
     ) {
     fail("--allow-loopback-auth requires --bearer-env in download mode")
   }
-  if progress &&
-    (
-      auditing ||
-      adopting ||
-      values.contains("--export-to") ||
-      values.contains("--repair-from")
-    ) {
-    fail("--progress is supported only for downloads")
+  if progress && (auditing || adopting || values.contains("--export-to")) {
+    fail("--progress is supported only for downloads or local repair")
   }
   if values.get("--repair-from") is Some(backup) {
     if auditing || adopting || values.contains("--export-to") {
@@ -191,7 +185,9 @@ async fn run() -> Unit {
       )
     }
     for key, _ in values {
-      if !identity_option(key) && key != "--repair-from" {
+      if !identity_option(key) &&
+        key != "--repair-from" &&
+        key != "--stop-after-blocks" {
         fail("download option \{key} is unsupported with --repair-from")
       }
     }
@@ -199,9 +195,11 @@ async fn run() -> Unit {
       spec,
       argument(values, "--output"),
       backup,
+      stop_after_blocks=small(values, "--stop-after-blocks", 100000),
+      on_progress=event => if progress { println(event.to_json().stringify()) },
     )
     println(
-      "repaired: confirmed=\{report.confirmed_bytes} copied=\{report.repaired_blocks} retained=\{report.recovery.retained_bytes} invalidated=\{report.recovery.invalidated.length()}",
+      "\{if report.complete { "repaired" } else { "repair-paused" }}: confirmed=\{report.confirmed_bytes} copied=\{report.repaired_blocks} retained=\{report.recovery.retained_bytes} invalidated=\{report.recovery.invalidated.length()}",
     )
     return
   }

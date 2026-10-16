@@ -3,7 +3,22 @@ import {
   "moonbitlang/async@0.22.4",
   "moonbitlang/async@0.22.4/fs",
   "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/core/env",
   "moonbitlang/core/json",
+}
+
+///|
+fn repair_progress_lines(stdout : String) -> Array[String] raise {
+  let events = []
+  for raw in stdout.split("\n") {
+    // Normalize only the CR in a platform CRLF delimiter, not JSON content.
+    let line = raw.strip_suffix("\r").unwrap_or(raw)
+    if line.has_prefix("[") {
+      assert_eq(@json.parse(line).stringify(), line.to_owned())
+      events.push(line.to_owned())
+    }
+  }
+  events
 }
 
 ///|
@@ -24,6 +39,13 @@ async fn invoke(path : String, extra : Array[String]) -> @shell.Output {
 
 ///|
 async fn main {
+  let sample = "[\"MFLREPAIR1\",\"paused\",\"7\",\"3\",\"1\",null]"
+  assert_eq(repair_progress_lines(sample + "\nsummary\n"), [sample])
+  assert_eq(repair_progress_lines(sample + "\r\nsummary\r\n"), [sample])
+  if @env.args().contains("--check-progress-lines") {
+    println("repair progress LF/CRLF decoding verified")
+    return
+  }
   let data = @fs.read_file("fixtures/earthquakes-2024-01-01.csv").binary()
   let dir = @fs.tmpdir(prefix="moonfetchledger-local-")
   defer @fs.rmdir(dir, recursive=true)
@@ -124,7 +146,72 @@ async fn main {
   recovered_export.check()
   assert_eq(@fs.read_file(refused_path).binary(), data)
   assert_eq(@fs.read_file(path + ".mfl").binary(), checkpoint)
+  let file = @fs.open(path, mode=ReadWrite)
+  file.write_at(b"\x00", position=8195L)
+  file.write_at(b"\x00", position=20483L)
+  file.sync()
+  file.close()
+  let damaged = @fs.read_file(path).binary()
+  let saved = @fs.read_file(path + ".mfl").binary()
+  for
+    unsupported in [
+      ["--parallel", "2"],
+      ["--chunk-size", "4096"],
+      ["--stop-after-blocks", "-1"],
+    ] {
+    let args = ["--repair-from", backup, "--progress"]
+    args.append(unsupported)
+    assert_true(invoke(path, args).exit_code() != 0)
+    assert_eq(@fs.read_file(path).binary(), damaged)
+    assert_eq(@fs.read_file(path + ".mfl").binary(), saved)
+  }
+  let paused = invoke(path, [
+    "--repair-from", backup, "--stop-after-blocks", "1", "--progress",
+  ])
+  paused.check()
+  assert_true(
+    paused
+    .stdout()
+    .contains(
+      "repair-paused: confirmed=23912 copied=1 retained=19816 invalidated=2",
+    ),
+  )
+  let events = repair_progress_lines(paused.stdout())
+  assert_eq(events, [
+    "[\"MFLREPAIR1\",\"recovered\",\"28008\",\"19816\",\"0\",null]", "[\"MFLREPAIR1\",\"block\",\"28008\",\"23912\",\"1\",[\"8192\",\"12288\"]]",
+    "[\"MFLREPAIR1\",\"paused\",\"28008\",\"23912\",\"1\",null]",
+  ])
+  let audit = invoke(path, ["--audit"])
+  audit.check()
+  assert_eq(
+    @json.parse(audit.stdout().trim()).stringify(),
+    "[\"MFLAUDIT1\",false,true,\"28008\",\"23912\",[[\"20480\",\"24576\"]],[]]",
+  )
+  let resumed = invoke(path, ["--repair-from", backup, "--progress"])
+  resumed.check()
+  assert_true(
+    resumed
+    .stdout()
+    .contains("repaired: confirmed=28008 copied=1 retained=23912 invalidated=0"),
+  )
+  assert_true(
+    resumed
+    .stdout()
+    .contains("[\"MFLREPAIR1\",\"complete\",\"28008\",\"28008\",\"1\",null]"),
+  )
+  assert_eq(@fs.read_file(path).binary(), data)
+  assert_eq(@fs.read_file(backup).binary(), data)
+  assert_eq(@fs.read_file(path + ".mfl").binary(), checkpoint)
+  let complete = invoke(path, [
+    "--repair-from", backup, "--stop-after-blocks", "0", "--progress",
+  ])
+  complete.check()
+  assert_true(
+    complete
+    .stdout()
+    .contains("repaired: confirmed=28008 copied=0 retained=28008"),
+  )
   println(
-    "local storage workflow verified: adoption, audit/reuse, verified export, refusal, offline selective repair from trusted backup and repeat repair with zero copies",
+    "local storage workflow verified: strict checkpoint refusal/recovery, adoption, audit/reuse, export, offline selective repair, saved JSON progress, one-block pause/resume retaining 23912 bytes and complete zero-budget reopen",
   )
 }

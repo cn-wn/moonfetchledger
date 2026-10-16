@@ -93,7 +93,8 @@ the demo serves the bundled public-domain USGS snapshot over loopback.
 - Implemented: verified export from complete retained artifacts to a new consumer
   path with failure cleanup and no-replacement publication.
 - Implemented: offline local-backup repair with source revalidation, readback,
-  selective copying and durable per-block recovery checkpoints.
+  selective copying, durable per-block recovery checkpoints, serialized copy
+  progress, block budgets and cooperative pause/resume after source verification.
 - Implemented: serialized download progress and callback-error restart behavior.
 - Implemented: cooperative pause intent, draining current batches and resuming
   saved coverage, with completion taking precedence and errors still propagating.

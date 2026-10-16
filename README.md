@@ -36,7 +36,8 @@ downloads, authentication and progress are shared capabilities, not novelty clai
 - Verified export to a new ready-to-use path: source reconciliation, copied-byte
   SHA-256, synced destination readback and publication without replacing files.
 - Offline selective repair from a fully verified local backup: preserve correct
-  target blocks, reject changed backup reads, checkpoint every repaired block.
+  target blocks, reject changed backup reads, checkpoint every repaired block;
+  [saved progress, copy budgets and cooperative pause/resume](docs/local-repair.md).
 - Serialized asynchronous download progress after saved coverage, with verified
   completion events and opt-in deterministic CLI JSON lines.
 - Cooperative pause intent: drain the current batch, save it, return resumable
