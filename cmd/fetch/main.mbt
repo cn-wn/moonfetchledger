@@ -18,8 +18,8 @@ fn integer(text : String, name : String) -> Int64 raise {
 fn small(
   values : Map[String, String],
   name : String,
-  default : Int,
-) -> Int raise {
+  default : Int32,
+) -> Int32 raise {
   let value = integer(values.get(name).unwrap_or(default.to_string()), name)
   if value > 2147483647L {
     fail("\{name} exceeds Int")

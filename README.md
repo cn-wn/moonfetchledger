@@ -1,8 +1,17 @@
 # MoonFetchLedger
 
-`cn-wn/moonfetchledger` is a reusable MoonBit library for sparse, out-of-order
-HTTP download reception and verified storage recovery. It records confirmed
-fixed-block coverage rather than trusting file length or a downloaded-byte count.
+`cn-wn/moonfetchledger` is a MoonBit block-integrity audit and repair layer for
+existing download clients. It reconciles actual fixed-block coverage, detects
+same-size content damage and preserves valid blocks during selective repair.
+
+The native [WebDAV integration](docs/webdav.md) extends the published
+[q2316367743/webdav](https://github.com/q2316367743/webdav) client: the upstream
+performs the original download and subsequent range requests; this project adds
+verified adoption, readback, sparse recovery and final integrity checks.
+[modelhub](https://github.com/QUHONGYE-gif/moonkit-modelhub) is an overlapping
+download/cache project and a comparison reference; it is not integrated here.
+See the [API and contribution comparison](docs/ecosystem.md). Ordinary resumable
+downloads, authentication and progress are shared capabilities, not novelty claims.
 
 ## Implemented
 
@@ -36,9 +45,26 @@ fixed-block coverage rather than trusting file length or a downloaded-byte count
   bounded loading and the same manifest for download, resume and offline operations.
 - Explicit interrupted-checkpoint recovery: preserve saved temporaries, validate
   actual blocks and promote a candidate only without losing valid recorded coverage.
+- Native `host.receive_from` shares storage recovery with external range sources.
+- WebDAV `Source` composes the upstream `get_file` and transport extension APIs:
+  exact object binding, response gates and bounded block consumption before writes.
 
 Core targets: wasm, wasm-gc, JavaScript and native. Host and actual validation
 boundaries are recorded in `docs/validation.md`.
+
+## Extend an existing WebDAV download
+
+```text
+moon update
+moon run --target native examples/webdav
+```
+
+The published client uploads/downloads the real USGS fixture. The ledger adopts
+it using an independent trusted digest, detects one changed byte without network,
+retains 23912 of 28008 bytes, and repairs just that block through WebDAV. It also
+checks encoded-response refusal, two nonadjacent bad blocks across pause/reopen,
+verified export and zero-fetch reuse after the origin stops. The loopback fixture
+implements only PUT/GET/OPTIONS; vendor WebDAV server compatibility is not claimed.
 
 ## Run the recovery example
 
@@ -132,9 +158,11 @@ Fixed aligned blocks for one HTTP object. Unknown lengths, weak/no validators,
 encoded representations, multipart ranges and mirror merging are unsupported.
 Full 200 responses or version changes require explicit restart.
 
-This is a complementary receive/storage-state layer, not a replacement HTTP stack,
-model hub, tus upload protocol or content-deduplication engine. We make no claim
-of ecosystem uniqueness or performance superiority. API review: `docs/ecosystem.md`.
+This is a complementary receive/storage-state layer. The earlier native HTTP CLI
+remains an optional reference adapter and is not the differentiated contribution.
+WebDAV operations, model discovery/cache layout, tus uploads and content-defined
+deduplication belong to their respective upstream projects. We make no claim of
+ecosystem uniqueness or performance superiority. API review: `docs/ecosystem.md`.
 
 Planned: signed release metadata integration and a browser storage
 adapter, driven by downstream needs. [Design and roadmap](docs/design.md).

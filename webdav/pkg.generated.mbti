@@ -1,0 +1,30 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "cn-wn/moonfetchledger/webdav"
+
+import {
+  "cn-wn/moonfetchledger",
+  "cn-wn/moonfetchledger/host",
+  "moonbitlang/core/debug",
+  "q2316367743/webdav/types",
+}
+
+// Values
+
+// Errors
+pub suberror SourceError {
+  InvalidConfig(String)
+  RequestFailed(String)
+} derive(@debug.Debug)
+pub fn SourceError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct Source {
+  spec : @moonfetchledger.ObjectSpec
+  // private fields
+}
+pub fn Source::new(@moonfetchledger.ObjectSpec, @types.WebdavConfig, String, allow_loopback_auth? : Bool) -> Self raise
+pub async fn Source::receive(Self, String, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int, on_progress? : async (@host.DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> @host.DownloadReport
+
+// Type aliases
+
+// Traits

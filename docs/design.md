@@ -2,12 +2,12 @@
 
 ## Users and complete workflows
 
-1. A MoonBit artifact updater downloads a versioned dataset or model file from a
-   range-enabled origin. It receives URL, length, strong ETag and SHA-256 from a
-   trusted release manifest, constructs ObjectSpec, reserves separate blocks,
-   receives them concurrently, confirms actual readback, and verifies the whole
-   file before activating it. A 200 fallback or changed version is a diagnostic,
-   never an implicit append to old data.
+1. An existing WebDAV application downloads a versioned artifact with its current
+   client. It adopts that complete file only after trusted SHA-256 verification.
+   Later it audits retained blocks, detects same-size corruption and repairs only
+   invalid blocks through the existing client's range API. The response gate and
+   ledger refuse changed versions, unsupported encoding and 200 fallback before
+   content writes. The final digest gates verified export to the consumer.
 2. A command-line data collector runs with intermittent connectivity. It retains
    output, checkpoint and lock sidecar. On another invocation it restores exactly
    the same identity, reads all recorded blocks from disk, and fetches only missing
@@ -33,6 +33,10 @@ response/version validation, crash-state reconciliation and integrity checks.
 - host.download is the optional native HTTP/filesystem reference integration.
   It returns completion, actual confirmed bytes, fetched blocks, retained bytes
   and invalidated ranges. Its errors remain distinct from LedgerError/I/O errors.
+- host.receive_from shares the complete native storage lifecycle with external
+  callbacks returning actual ReceivedBlock metadata. webdav.Source composes the
+  published client's get_file and Transport APIs with this same lifecycle; it
+  retains the upstream 2147483647-byte limit. Basic credentials are transient.
 - Session.unconfirmed_ranges projects sorted/coalesced gaps without mutations;
   host.audit inspects retained disk files without network or content writes and
   requires whole-file SHA-256 success before reporting completion. Its report
@@ -99,6 +103,9 @@ the demo serves the bundled public-domain USGS snapshot over loopback.
   bounds, no identity overrides, download/resume and complete offline integration.
 - Implemented: interrupted checkpoint candidate recovery, monotonic valid coverage,
   offline promotion/reporting and refusal to overwrite retained temporary files.
+- Implemented: existing WebDAV client integration, shared source-independent
+  storage recovery, guarded range consumption and audit/repair after upstream
+  download/adoption, including same-size corruption and nonadjacent gaps.
 - Planned: signed release metadata integration beyond independent SHA-256 pins.
 - Planned: independent browser storage adapter with the same receive contract;
   versioned checkpoint migrations only when a concrete schema extension is needed.

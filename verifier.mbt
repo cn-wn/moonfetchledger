@@ -2,7 +2,7 @@
 /// Sequential bounded-memory verifier suitable for asynchronous storage adapters.
 pub struct Verifier {
   priv spec : ObjectSpec
-  priv chunk_size : Int
+  priv chunk_size : Int32
   priv hasher : @crypto.SHA256
   priv mut position : Int64
   priv mut result : String?
@@ -21,7 +21,7 @@ pub fn Session::verifier(self : Session) -> Verifier raise LedgerError {
 }
 
 ///|
-fn Verifier::new(spec : ObjectSpec, chunk_size : Int) -> Verifier {
+fn Verifier::new(spec : ObjectSpec, chunk_size : Int32) -> Verifier {
   {
     spec,
     chunk_size,

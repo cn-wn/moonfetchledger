@@ -45,7 +45,7 @@ async test "pause drains reserved batch and fresh resume requests only remaining
       "\"v1\"",
       @ledger.digest(data),
     )
-    let requested : Array[Int] = []
+    let requested : Array[Int32] = []
     let serving = group.spawn(() => {
       for _ in 0..<4 {
         let (conn, _) = server.accept()

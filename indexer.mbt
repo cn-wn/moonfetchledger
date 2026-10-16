@@ -9,7 +9,7 @@ pub struct StorageIndexer {
 ///|
 pub fn StorageIndexer::new(
   spec : ObjectSpec,
-  chunk_size? : Int = 1048576,
+  chunk_size~ : Int32 = 1048576,
 ) -> StorageIndexer raise LedgerError {
   let session = Session::new(spec, chunk_size~)
   { session, verifier: Verifier::new(spec, chunk_size), }

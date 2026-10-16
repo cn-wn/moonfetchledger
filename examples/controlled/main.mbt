@@ -4,7 +4,7 @@ async fn main {
   let dir = @fs.tmpdir(prefix="moonfetchledger-controlled-")
   defer @fs.rmdir(dir, recursive=true)
   let path = dir + "/data.csv"
-  let requested : Array[Int] = []
+  let requested : Array[Int32] = []
   @async.with_task_group(group => {
     let server = @http.Server::Server(@socket.Addr::parse("127.0.0.1:0"))
     defer server.close()

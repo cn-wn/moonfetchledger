@@ -6,7 +6,7 @@
 pub async fn adopt(
   spec : @ledger.ObjectSpec,
   output : String,
-  chunk_size? : Int = 65536,
+  chunk_size~ : Int32 = 65536,
 ) -> Unit {
   let indexer = @ledger.StorageIndexer::new(spec, chunk_size~)
   if output.is_empty() || !@fs.exists(output) || @fs.kind(output) != Regular {

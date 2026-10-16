@@ -42,11 +42,11 @@ fn content_range(text : String) -> (@ledger.ByteRange, Int64) raise {
 ///|
 priv enum FetchResult {
   Payload(Bytes)
-  Retry(String, Int)
+  Retry(String, Int32)
 }
 
 ///|
-fn retry_delay(header : String?, fallback : Int) -> Int raise HostError {
+fn retry_delay(header : String?, fallback : Int32) -> Int32 raise HostError {
   match header {
     None => fallback
     Some(text) => {
@@ -77,13 +77,12 @@ fn retry_delay(header : String?, fallback : Int) -> Int raise HostError {
 ///|
 async fn fetch_once(
   spec : @ledger.ObjectSpec,
-  lease : @ledger.Lease,
-  timeout : Int,
-  delay : Int,
+  requested : @ledger.ByteRange,
+  timeout : Int32,
+  delay : Int32,
   auth : BearerAuth?,
 ) -> FetchResult {
   @async.with_timeout(timeout, () => {
-    let requested = lease.range
     let headers : @http.Headers = {
       "Range": "bytes=\{requested.start}-\{requested.end - 1L}",
       "If-Range": spec.etag,
@@ -136,7 +135,7 @@ async fn fetch_once(
     InvalidResponse(_) as error => raise error
     InvalidInput(_) as error => raise error
     other => {
-      if auth is Some(_) && !@async.is_cancellation_error(other) {
+      if auth is Some(_) {
         // Do not expose untrusted parser/transport diagnostics that could reflect
         // a credential. Known adapter diagnostics above contain no input values.
         raise InvalidResponse(
@@ -153,18 +152,18 @@ async fn fetch_once(
 // outside this loop, after the response has passed every representation check.
 async fn fetch(
   spec : @ledger.ObjectSpec,
-  lease : @ledger.Lease,
-  attempts : Int,
-  delay : Int,
-  timeout : Int,
+  range : @ledger.ByteRange,
+  attempts : Int32,
+  delay : Int32,
+  timeout : Int32,
   auth : BearerAuth?,
 ) -> Bytes {
   for attempt = 1; ; attempt = attempt + 1 {
-    match fetch_once(spec, lease, timeout, delay, auth) {
+    match fetch_once(spec, range, timeout, delay, auth) {
       Payload(bytes) => return bytes
       Retry(reason, wait) => {
         if attempt == attempts {
-          raise RetryExhausted(lease.range, attempt, reason)
+          raise RetryExhausted(range, attempt, reason)
         }
         @async.sleep(wait)
       }

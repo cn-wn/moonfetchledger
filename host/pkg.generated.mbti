@@ -17,6 +17,8 @@ pub async fn export_verified(@moonfetchledger.ObjectSpec, String, String) -> Uni
 
 pub async fn load_manifest(String, String) -> @moonfetchledger.ObjectSpec
 
+pub async fn receive_from(@moonfetchledger.ObjectSpec, String, fetch_range~ : async (@moonfetchledger.ByteRange) -> ReceivedBlock, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int, on_progress? : async (DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> DownloadReport
+
 pub async fn recover_checkpoint(@moonfetchledger.ObjectSpec, String) -> AuditReport
 
 pub async fn repair_from_local(@moonfetchledger.ObjectSpec, String, String) -> LocalRepairReport
@@ -81,6 +83,15 @@ pub struct LocalRepairReport {
   recovery : @moonfetchledger.RecoveryReport
 } derive(@debug.Debug)
 pub fn LocalRepairReport::to_repr(Self) -> @debug.Repr
+
+pub(all) struct ReceivedBlock {
+  bytes : Bytes
+  status : Int
+  etag : String
+  range : @moonfetchledger.ByteRange
+  total : Int64
+  content_encoding : String
+}
 
 // Type aliases
 

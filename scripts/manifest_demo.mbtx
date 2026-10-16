@@ -1,10 +1,10 @@
 ///|
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/http",
-  "moonbitlang/async@0.21.3/shell",
-  "moonbitlang/async@0.21.3/socket",
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/http",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/async@0.22.4/socket",
   "moonbitlang/x@0.5.5/crypto",
   "moonbitlang/core/json",
   "moonbitlang/core/string" @strconv,
@@ -18,7 +18,7 @@ fn hash(bytes : Bytes) -> String {
 ///|
 async fn call(
   args : Array[String],
-  authenticated? : Bool = false,
+  authenticated~ : Bool = false,
 ) -> @shell.Output {
   let command = ["run", "--target", "native", "cmd/fetch", "--"]
   command.append(args)
@@ -41,7 +41,7 @@ async fn invoke(
   pin : String,
   path : String,
   extra : Array[String],
-  authenticated? : Bool = false,
+  authenticated~ : Bool = false,
 ) -> @shell.Output {
   let args = [
     "--manifest", manifest, "--manifest-sha256", pin, "--output", path,
@@ -61,7 +61,7 @@ async fn main {
   defer @fs.rmdir(dir, recursive=true)
   let manifest = dir + "/release.json"
   let path = dir + "/retained.csv"
-  let requested : Array[Int] = []
+  let requested : Array[Int32] = []
   @async.with_task_group(group => {
     let server = @http.Server::Server(@socket.Addr::parse("127.0.0.1:0"))
     defer server.close()

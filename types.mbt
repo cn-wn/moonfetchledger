@@ -105,11 +105,11 @@ priv enum Block {
 ///|
 pub struct Session {
   spec : ObjectSpec
-  chunk_size : Int
+  chunk_size : Int32
   priv blocks : Array[Block]
   priv mut next_id : Int64
   priv mut recovering : Bool
-  priv mut search_start : Int
+  priv mut search_start : Int32
   priv mut confirmed : Int64
 }
 
@@ -118,7 +118,7 @@ pub struct Session {
 pub struct Lease {
   range : ByteRange
   priv owner : Session
-  priv index : Int
+  priv index : Int32
   priv id : Int64
 }
 

@@ -4,7 +4,7 @@
 /// concurrent network requests, not unsynchronized threads mutating a session.
 pub fn Session::new(
   spec : ObjectSpec,
-  chunk_size? : Int = 1048576,
+  chunk_size~ : Int32 = 1048576,
 ) -> Session raise LedgerError {
   if chunk_size < 1 || chunk_size > 4194304 {
     raise InvalidSpec("chunk size must be 1..4194304 bytes")
@@ -27,7 +27,7 @@ pub fn Session::new(
 }
 
 ///|
-fn Session::block_range(self : Session, index : Int) -> ByteRange {
+fn Session::block_range(self : Session, index : Int32) -> ByteRange {
   let start = index.to_int64() * self.chunk_size.to_int64()
   {
     start,
@@ -94,11 +94,11 @@ pub fn Session::prepare_chunk(
   self : Session,
   lease : Lease,
   bytes : Bytes,
-  status~ : Int,
+  status~ : Int32,
   etag~ : String,
   range~ : ByteRange,
   total~ : Int64,
-  content_encoding? : String = "identity",
+  content_encoding~ : String = "identity",
 ) -> PreparedChunk raise LedgerError {
   self.check_lease(lease)
   if status != 206 {

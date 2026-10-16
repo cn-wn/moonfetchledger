@@ -1,0 +1,20 @@
+import {
+  "cn-wn/moonfetchledger" @ledger,
+  "cn-wn/moonfetchledger/host",
+  "moonbitlang/core/buffer",
+  "moonbitlang/core/string" @strconv,
+  "q2316367743/webdav" @upstream,
+  "q2316367743/webdav/types" @dav_types,
+  "q2316367743/moonhttp/transport",
+  "q2316367743/moonhttp/httpconn" @wire,
+}
+
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "q2316367743/moonhttp/headers",
+} for "wbtest"
+
+options(
+  supported_targets: "native",
+)

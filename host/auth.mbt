@@ -13,7 +13,7 @@ pub struct BearerAuth {
 pub fn BearerAuth::new(
   resource : String,
   token : String,
-  allow_loopback_http? : Bool = false,
+  allow_loopback_http~ : Bool = false,
 ) -> BearerAuth raise HostError {
   if token.is_empty() || token.length() > 4096 {
     raise InvalidInput("Bearer token must contain 1..4096 ASCII characters")

@@ -1,10 +1,10 @@
 ///|
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/http",
-  "moonbitlang/async@0.21.3/shell",
-  "moonbitlang/async@0.21.3/socket",
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/http",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/async@0.22.4/socket",
   "moonbitlang/core/json",
   "moonbitlang/core/string" @strconv,
 }
@@ -32,8 +32,8 @@ async fn main {
   assert_eq(data.length(), 28008)
   let dir = @fs.tmpdir(prefix="moonfetchledger-e2e-")
   defer @fs.rmdir(dir, recursive=true)
-  let requested : Array[Int] = []
-  let completed : Array[Int] = []
+  let requested : Array[Int32] = []
+  let completed : Array[Int32] = []
   let mut reject_once = true
   let mut reverse_first = true
   let mut transient = 0
@@ -259,7 +259,7 @@ async fn main {
 fn check_progress(
   text : String,
   retained : Int64,
-  blocks : Int,
+  blocks : Int32,
   final_phase : String,
 ) -> Unit raise {
   let mut seen = 0

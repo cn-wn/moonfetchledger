@@ -1,8 +1,8 @@
 ///|
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/shell",
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/shell",
 }
 
 ///|
@@ -13,6 +13,8 @@ async fn checked(args : Array[String]) -> Unit {
 
 ///|
 async fn main {
+  checked(["version", "--all"])
+  checked(["tree"])
   let inventory = @shell.Cmd("git", [
     "ls-files", "--cached", "--others", "--exclude-standard",
   ]).output()
@@ -50,6 +52,7 @@ async fn main {
   checked(["run", "scripts/recovery_demo.mbtx"])
   checked(["run", "scripts/local_storage_demo.mbtx"])
   checked(["run", "--target", "native", "examples/controlled"])
+  checked(["run", "--target", "native", "examples/webdav"])
   checked(["run", "scripts/auth_demo.mbtx"])
   checked(["run", "scripts/manifest_demo.mbtx"])
   checked(["run", "scripts/checkpoint_recovery_demo.mbtx"])

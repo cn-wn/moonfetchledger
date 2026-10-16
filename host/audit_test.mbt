@@ -12,7 +12,7 @@ fn audit_spec(bytes : Bytes) -> @ledger.ObjectSpec raise {
 fn audit_checkpoint(
   spec : @ledger.ObjectSpec,
   bytes : Bytes,
-  indices : Array[Int],
+  indices : Array[Int32],
 ) -> String raise {
   let s = @ledger.Session::new(spec, chunk_size=3)
   let mut index = 0

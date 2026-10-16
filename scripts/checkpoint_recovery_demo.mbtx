@@ -1,10 +1,10 @@
 ///|
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/http",
-  "moonbitlang/async@0.21.3/shell",
-  "moonbitlang/async@0.21.3/socket",
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/http",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/async@0.22.4/socket",
   "moonbitlang/core/json",
   "moonbitlang/core/string" @strconv,
 }
@@ -32,7 +32,7 @@ async fn main {
   let dir = @fs.tmpdir(prefix="moonfetchledger-checkpoint-demo-")
   defer @fs.rmdir(dir, recursive=true)
   let path = dir + "/earthquakes.csv"
-  let requested : Array[Int] = []
+  let requested : Array[Int32] = []
   @async.with_task_group(group => {
     let server = @http.Server::Server(@socket.Addr::parse("127.0.0.1:0"))
     defer server.close()

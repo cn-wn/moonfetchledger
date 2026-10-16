@@ -1,26 +1,30 @@
-# Validation record — 2026-10-10
+# Validation record — 2026-10-16
 
 Stable download channel binaries match the local version:
 
 ```text
-moon 0.1.20260920 (914d7da 2026-09-20)
-moonc v0.10.14+7d59c7ec9 (2026-09-18)
-moonrun 0.1.20260920
+moon 0.1.20261012 (748b63c 2026-10-12)
+moonc v0.10.15+943464bfa (2026-10-12)
+moonrun 0.1.20261012
 ```
 
-The Windows moon executable matches the official latest checksum list at
-https://cli.moonbitlang.com/binaries/latest/moonbit-windows-x86_64.sha256 .
+The Windows and Linux moon executables match the official latest checksum lists:
+https://cli.moonbitlang.com/binaries/latest/moonbit-windows-x86_64.sha256 and
+https://cli.moonbitlang.com/binaries/latest/moonbit-linux-x86_64.sha256 .
 The isolated Linux toolchain reports the same compiler/build-tool versions.
+Windows moon SHA-256: `296a895d934b6a07522214cbf89caf0cf5605efe4fb82efe07b929fbf9d27432`;
+Linux moon: `a31026b83410607909ebae469fa19e46c32201cfe403be6099e1da961a5ebf0f`.
 
-- Windows: strict core tests on wasm, wasm-gc and js.
-- Ubuntu/WSL, GCC 12.5: actual native tests and actual native assembly example.
+- Ubuntu/WSL, GCC 12.5: actual four-target tests, native assembly and integration
+  examples. Windows local tooling is used for strict checks and API discovery.
 - 27 tests per portable target, including the checked README. Generated property cases cover
   129 binary sizes x 4 block sizes (516 complete reception/recovery round trips).
 - Native host adds response-range validation, preservation of unrelated/extra
   data, exclusive-lock/reopen, checkpoint preservation and retry-budget/wait-hint
   boundary tests, read-only auditing, shared/exclusive lock interaction and
   whole-file integrity, adoption, export, repair, progress, pause, authentication,
-  pinned manifests and interrupted checkpoint recovery (63 total on native).
+  pinned manifests, interrupted checkpoint recovery and source/WebDAV integration
+  (71 total on native, including the checked WebDAV usage example).
 - Coverage projection: all 128 confirmation masks for seven blocks, including
   reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
   return arrays, checkpoint preservation, restoration gate and maximum length.
@@ -107,9 +111,41 @@ save, promotes 16384 confirmed bytes without network or artifact writes, resumes
 only three remaining blocks, refuses stale coverage and reopens with the origin
 stopped. Pinned-manifest recovery is verified in the manifest workflow.
 
+WebDAV integration uses the published q2316367743/webdav 0.1.0, moonhttp 0.5.0,
+Milky2018/xml 0.5.0 and a shared async 0.22.4 (recorded by `moon tree`). The previous
+native HTTP entry point keeps its generated signature and delegates storage to
+receive_from. The stable formatter normalizes Int32/default-label syntax; core
+public interfaces and MFL1 bytes retain their existing contracts. In async 0.22.4
+cancellation is no longer caught as an error, so the deprecated cancellation-error
+predicate was removed from authenticated error redaction.
+
+New tests check external metadata before artifact writes, error/retry recovery,
+cross-call pause/repair/reopen, exact upstream conditional/range/auth headers, all
+eight three-block sparse coverage masks, Int32/URL/auth/timeout limits, short/extra
+bodies, status/ETag/range/encoding/length refusal, static credential-safe errors
+and a checked public usage example. The WebDAV real-data example uses actual
+published clients and sockets: upstream upload/full download, trusted adoption,
+offline same-size corruption audit retaining 23912 of 28008 bytes, encoded-response
+refusal without content writes, one-block repair, nonadjacent two-block pause/
+reopen, verified export and stopped-origin zero-fetch reuse. Its fixture implements
+only PUT/GET/OPTIONS, not a full WebDAV server or vendor interoperability suite.
+No complete foreign corrupt file is adopted as trusted coverage. Modelhub remains
+a comparison reference; there is no dedicated modelhub integration.
+
+The complete unchanged verification script passed in a Linux-local snapshot,
+with all 97 project files compared byte-for-byte against the original working
+tree before and after validation. In the Windows-mounted checkout the manifest
+workflow reached the existing 180-second subprocess budget; the Linux-local run
+kept that budget and completed all stages. Use a Linux-local checkout when a
+cross-OS mounted filesystem makes repeated CLI invocations too slow. This is an
+environment observation, not a performance claim about the library.
+
 Upstream async C stubs produced GCC's ignored-return-value warning and MSVC's
 EINVAL macro-redefinition warning; project
 MoonBit code is checked with `--deny-warn`. No dependency code was modified.
+The current standalone-script dependency graph also reports a duplicate import
+warning for async/internal/c_buffer. This tool/dependency warning is recorded
+separately from the project's strict source checks and is not suppressed by patches.
 
 Reproduce in a shell with moon, node and the platform C compiler on PATH:
 
@@ -125,6 +161,7 @@ versions pinned independently in the script import headers.
 `local_storage_demo.mbtx` verifies adoption and export without a network origin.
 `manifest_demo.mbtx` verifies pinned publisher-to-consumer identity and all offline modes.
 `checkpoint_recovery_demo.mbtx` verifies interrupted checkpoint promotion and resume.
+`moon run --target native examples/webdav` verifies the existing-client extension.
 The fixture server shuts down through a finite accept loop and an explicit stop
 request, including on Windows. Verification commands have three-minute budgets;
 CI jobs have a ten-minute ceiling and print each stage before starting it.

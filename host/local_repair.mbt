@@ -1,7 +1,7 @@
 ///|
 pub struct LocalRepairReport {
   confirmed_bytes : Int64
-  repaired_blocks : Int
+  repaired_blocks : Int32
   recovery : @ledger.RecoveryReport
 } derive(Debug)
 

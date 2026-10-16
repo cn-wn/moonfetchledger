@@ -115,7 +115,7 @@ async test "block notifications see saved coverage; observer failure resumes wit
       "\"v1\"",
       @ledger.digest(data),
     )
-    let requested : Array[Int] = []
+    let requested : Array[Int32] = []
     let serving = group.spawn(() => {
       for _ in 0..<3 {
         let (conn, _) = server.accept()

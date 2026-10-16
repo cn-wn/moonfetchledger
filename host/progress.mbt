@@ -16,7 +16,7 @@ pub struct DownloadProgress {
   phase : DownloadPhase
   total_bytes : Int64
   confirmed_bytes : Int64
-  downloaded_blocks : Int
+  downloaded_blocks : Int32
 } derive(Debug)
 
 ///|
@@ -52,7 +52,7 @@ pub fn DownloadProgress::to_json(self : DownloadProgress) -> Json {
 ///|
 priv struct ProgressTracker {
   callback : (async (DownloadProgress) -> Unit)?
-  mut downloaded : Int
+  mut downloaded : Int32
 }
 
 ///|

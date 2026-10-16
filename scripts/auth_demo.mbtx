@@ -1,10 +1,10 @@
 ///|
 import {
-  "moonbitlang/async@0.21.3",
-  "moonbitlang/async@0.21.3/fs",
-  "moonbitlang/async@0.21.3/http",
-  "moonbitlang/async@0.21.3/shell",
-  "moonbitlang/async@0.21.3/socket",
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/http",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/async@0.22.4/socket",
   "moonbitlang/core/json",
   "moonbitlang/core/string" @strconv,
 }
@@ -15,7 +15,7 @@ async fn invoke(
   path : String,
   token : String,
   extra : Array[String],
-  authenticated? : Bool = true,
+  authenticated~ : Bool = true,
 ) -> @shell.Output {
   let args = [
     "run", "--target", "native", "cmd/fetch", "--", "--url", url, "--output", path,
