@@ -45,10 +45,7 @@ pub async fn repair_from_local(
       "checkpoint temporary file exists; inspect it before repair",
     )
   }
-  if @fs.file_size(checkpoint) > 16000000L {
-    raise CheckpointTooLarge
-  }
-  let session = @ledger.restore(@fs.read_file(checkpoint).text(), spec)
+  let session = load_checkpoint(checkpoint, spec)
   if @fs.exists(output) &&
     (@fs.kind(output) != Regular || @fs.file_size(output) > spec.length) {
     raise InvalidInput("target must be regular and contain no extra data")

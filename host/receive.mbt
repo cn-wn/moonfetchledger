@@ -111,10 +111,7 @@ pub async fn receive_from(
     raise OutputLocked
   }
   let session = if @fs.exists(checkpoint) {
-    if @fs.file_size(checkpoint) > 16000000L {
-      raise CheckpointTooLarge
-    }
-    @ledger.restore(@fs.read_file(checkpoint).text(), spec)
+    load_checkpoint(checkpoint, spec)
   } else {
     if @fs.exists(output) {
       raise InvalidInput(

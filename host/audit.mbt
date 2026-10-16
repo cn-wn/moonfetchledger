@@ -57,10 +57,7 @@ pub async fn audit(spec : @ledger.ObjectSpec, output : String) -> AuditReport {
     raise OutputLocked
   }
   let checkpoint = output + ".mfl"
-  if @fs.file_size(checkpoint) > 16000000L {
-    raise CheckpointTooLarge
-  }
-  let session = @ledger.restore(@fs.read_file(checkpoint).text(), spec)
+  let session = load_checkpoint(checkpoint, spec)
   let file = if @fs.exists(output) {
     Some(@fs.open(output, mode=ReadOnly))
   } else {

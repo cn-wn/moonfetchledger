@@ -23,35 +23,6 @@ async fn replace_checkpoint(
 }
 
 ///|
-async fn pending_session(
-  path : String,
-  spec : @ledger.ObjectSpec,
-) -> @ledger.Session {
-  let file = @fs.open(path, mode=ReadOnly)
-  defer file.close()
-  if file.kind() != Regular {
-    raise InvalidInput("checkpoint recovery requires regular checkpoint files")
-  }
-  let size = file.size()
-  if size > 16000000L {
-    raise CheckpointTooLarge
-  }
-  let bytes = file.read_exactly(size.to_int())
-  if file.read_some(max_len=1) is Some(_) || file.size() != size {
-    raise InvalidInput(
-      "checkpoint length changed during recovery; retain input",
-    )
-  }
-  let text = @utf8.decode(bytes) catch {
-    _ =>
-      raise InvalidInput(
-        "checkpoint recovery requires strict UTF-8; retain malformed input",
-      )
-  }
-  @ledger.restore(text, spec)
-}
-
-///|
 async fn recovery_read(
   file : @fs.File?,
   size : Int64,
@@ -127,9 +98,9 @@ pub async fn recover_checkpoint(
   if !lock.try_lock(Exclusive) {
     raise OutputLocked
   }
-  let pending = pending_session(candidate, spec)
+  let pending = load_checkpoint(candidate, spec)
   let current = if @fs.exists(checkpoint) {
-    Some(pending_session(checkpoint, spec))
+    Some(load_checkpoint(checkpoint, spec))
   } else {
     None
   }

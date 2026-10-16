@@ -34,6 +34,29 @@ async fn main {
   assert_true(adopted.stdout().contains("adopted: confirmed=28008"))
   assert_eq(@fs.read_file(path).binary(), data)
   let checkpoint = @fs.read_file(path + ".mfl").binary()
+  // All session readers refuse the same malformed bytes, preserving actual data.
+  let input_backup = dir + "/input-backup.csv"
+  @fs.write_file(input_backup, data)
+  @fs.write_file(path + ".mfl", b"\xff")
+  for
+    extra in [
+      ["--audit"],
+      [],
+      ["--repair-from", input_backup],
+      ["--export-to", dir + "/input-refused.csv"],
+    ] {
+    let rejected = invoke(path, extra)
+    assert_true(rejected.exit_code() != 0)
+    assert_true(
+      (rejected.stdout() + rejected.stderr()).contains("strict UTF-8"),
+    )
+    assert_eq(@fs.read_file(path + ".mfl").binary(), b"\xff")
+    assert_eq(@fs.read_file(path).binary(), data)
+    assert_true(
+      !@fs.exists(path + ".mfl.next") && !@fs.exists(dir + "/input-refused.csv"),
+    )
+  }
+  @fs.write_file(path + ".mfl", checkpoint)
   let audit = invoke(path, ["--audit"])
   audit.check()
   let invalid_progress = invoke(path, ["--audit", "--progress"])

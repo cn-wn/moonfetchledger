@@ -58,10 +58,7 @@ pub async fn export_verified(
   if !lock.try_lock(Shared) {
     raise OutputLocked
   }
-  if @fs.file_size(checkpoint) > 16000000L {
-    raise CheckpointTooLarge
-  }
-  let session = @ledger.restore(@fs.read_file(checkpoint).text(), spec)
+  let session = load_checkpoint(checkpoint, spec)
   let source = @fs.open(output, mode=ReadOnly)
   defer source.close()
   let size = source.size()

@@ -25,7 +25,7 @@ are rejected. It emits the existing deterministic MFLAUDIT1 report. No HTTP
 requests occur and artifact bytes are never written or truncated.
 
 The operation requires an existing regular lock sidecar and regular `.mfl.next`.
-It acquires the exclusive cooperative lock, reads at most 16M bytes per checkpoint,
+It acquires the exclusive cooperative lock, accepts at most 16M bytes per checkpoint,
 strictly decodes UTF-8 and requires the exact MFL1 schema and expected identity.
 If the installed checkpoint exists, it must also parse and have the same block
 layout. A missing installed checkpoint is supported, including a first-save
@@ -64,6 +64,20 @@ in a trusted directory, not hardlink tricks or malicious external writers.
 Normal checkpoint saves also create `.next` exclusively, clean only their own
 temporary after failure, and replace the installed checkpoint after syncing.
 Local adoption and local repair likewise refuse checkpoint recovery temporaries.
+
+All native readers (receive/download, audit, export, local repair and checkpoint
+recovery) share the same bounded checkpoint loader. It checks file kind, obtains
+length and reads through the same open handle, consumes at most that capped length
+plus a one-byte EOF probe, and refuses observed length changes. This closes the
+unbounded `stat`-then-`read_file` growth window in ordinary session restoration.
+Malformed UTF-8 reports `InvalidInput` with a retain-input instruction; oversized
+input reports `CheckpointTooLarge`. Valid MFL1 bytes and public signatures remain
+unchanged. Strict decoding already existed; it is now reported consistently.
+Same-size concurrent changes and malicious path substitution remain outside the
+trusted-directory/cooperative-lock contract; this is not an atomic filesystem snapshot.
+The local storage demo tests all four ordinary readers against malformed metadata,
+checks artifact/checkpoint preservation, restores the original checkpoint and
+continues through audit, reuse, repair and export.
 
 Run `moon run scripts/checkpoint_recovery_demo.mbtx`. Using the real USGS fixture,
 it obtains two valid checkpoints from successive downloads, reconstructs an

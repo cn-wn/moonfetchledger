@@ -1,4 +1,4 @@
-# Validation record — 2026-10-16
+# Validation record — 2026-10-17
 
 Stable download channel binaries match the local version:
 
@@ -24,7 +24,7 @@ Linux moon: `a31026b83410607909ebae469fa19e46c32201cfe403be6099e1da961a5ebf0f`.
   boundary tests, read-only auditing, shared/exclusive lock interaction and
   whole-file integrity, adoption, export, repair, progress, pause, authentication,
   pinned manifests, interrupted checkpoint recovery and source/WebDAV integration
-  (71 total on native, including the checked WebDAV usage example).
+  (74 total on native, including the checked WebDAV usage example).
 - Coverage projection: all 128 confirmation masks for seven blocks, including
   reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
   return arrays, checkpoint preservation, restoration gate and maximum length.
@@ -131,6 +131,14 @@ reopen, verified export and stopped-origin zero-fetch reuse. Its fixture impleme
 only PUT/GET/OPTIONS, not a full WebDAV server or vendor interoperability suite.
 No complete foreign corrupt file is adopted as trusted coverage. Modelhub remains
 a comparison reference; there is no dedicated modelhub integration.
+
+Unified checkpoint input tests cover four ordinary native reader workflows,
+five malformed UTF-8 encodings, directory preservation, exactly 16000000 accepted
+bytes and 16000001 refused bytes, no fetch/publication on rejection, lock release
+and successful reuse after replacing malformed metadata. All five native session
+entry points now use bounded reads on the same handle as the size/kind checks;
+the EOF probe reads at most one additional byte. The real-data local storage demo
+also checks CLI refusal/preservation across receive, audit, local repair and export.
 
 The complete unchanged verification script passed in a Linux-local snapshot,
 with all 97 project files compared byte-for-byte against the original working

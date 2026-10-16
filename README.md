@@ -20,6 +20,8 @@ downloads, authentication and progress are shared capabilities, not novelty clai
 - Response validation before writing; readback confirmation and idempotent commits.
 - Deterministic strict checkpoints; restoration distrusts recorded coverage until
   the adapter reads actual storage and reports corrupt/missing blocks.
+- All native checkpoint readers use regular files, a 16M-byte input cap, bounded
+  same-handle reads and strict UTF-8/schema validation; rejected inputs are retained.
 - Bounded-memory whole-file verification, including asynchronous adapter support.
 - Blocks of 1..4194304 bytes, at most 100000 blocks, short final blocks and empty
   objects. Int64 offsets never pass through floating-point serialization.
