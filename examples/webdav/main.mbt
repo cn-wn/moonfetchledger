@@ -12,6 +12,8 @@ async fn main {
   let ready = dir + "/ready.csv"
   let requested : Array[Int32] = []
   let mut full_gets = 0
+  let mut resume_probes = 0
+  let mut wire_requests = 0
   let mut uploads = 0
   let mut stored : Bytes? = None
   let mut encoded = false
@@ -34,6 +36,7 @@ async fn main {
         group.spawn_bg(() => {
           defer conn.close()
           assert_eq(request.path, "/dav/earthquakes.csv")
+          wire_requests += 1
           let authorization = "Basic " +
             @base64.encode(b"fixture:public-webdav-test-password")
           assert_eq(request.headers.get("Authorization"), Some(authorization))
@@ -58,6 +61,19 @@ async fn main {
             assert_eq(request.meth, Get)
             let artifact = stored.unwrap()
             if request.headers.get("Range") is Some(header) {
+              if header == "bytes=28008-" {
+                // A legal unsatisfied suffix request for a full-length file.
+                // The upstream resume API uses length as its completion test.
+                assert_eq(request.headers.get("If-Range"), Some(etag))
+                resume_probes += 1
+                conn.send_response(416, "Range Not Satisfiable", extra_headers={
+                  "Content-Range": "bytes */28008",
+                  "ETag": etag,
+                  "Connection": "close",
+                })
+                conn.end_response()
+                return
+              }
               assert_eq(request.headers.get("If-Match"), Some(etag))
               assert_eq(
                 request.headers.get("Accept-Encoding"),
@@ -125,6 +141,18 @@ async fn main {
       28008L,
       etag,
       sha256,
+    )
+    // In this fixture the publisher independently knows the original bytes and
+    // trusted whole digest. Consumers must receive this pin through trusted input.
+    let reference_path = dir + "/release.blocks.mfl"
+    let reference_pin = @host.write_block_reference(
+      spec,
+      "fixtures/earthquakes-2024-01-01.csv",
+      reference_path,
+      chunk_size=4096,
+    )
+    let reference = @host.load_block_reference(
+      spec, reference_path, reference_pin,
     )
     @host.adopt(spec, output, chunk_size=4096)
     assert_true(requested.is_empty())
@@ -195,6 +223,57 @@ async fn main {
     assert_eq(@fs.read_file(output).binary(), data)
     @host.export_verified(spec, output, ready)
     assert_eq(@fs.read_file(ready).binary(), data)
+    // Losing local progress must not force a complete redownload or trust a
+    // damaged artifact. Only the independent publisher reference supplies hashes.
+    @fs.remove(output + ".mfl")
+    let lost = @fs.open(output, mode=ReadWrite)
+    lost.write_at(b"\x00", position=16387L)
+    lost.sync()
+    lost.close()
+    let damaged_without_checkpoint = @fs.read_file(output).binary()
+    let reference_bytes = @fs.read_file(reference_path).binary()
+    let requests_before = requested.length()
+    client.download_to_path_resume(
+      path="/earthquakes.csv",
+      local_path=output,
+      etag~,
+    )
+    assert_eq(resume_probes, 1)
+    assert_eq(@fs.read_file(output).binary(), damaged_without_checkpoint)
+    assert_eq(@fs.file_size(output), 28008L)
+    println(
+      "upstream boundary: same-size corrupt artifact; documented 416/total-length resume returned successfully, while content remains damaged",
+    )
+    let wire_before_reference = wire_requests
+    try @host.adopt(spec, output, chunk_size=4096) catch {
+      @ledger.DigestMismatch(_) => ()
+      _ => fail("ordinary adoption must require complete correct content")
+    } noraise {
+      _ => fail("trusted damaged content without a block reference")
+    }
+    assert_true(!@fs.exists(output + ".mfl"))
+    let independently_audited = @host.audit_with_reference(reference, output)
+    assert_eq(independently_audited.confirmed_bytes, 23912L)
+    assert_eq(independently_audited.invalidated, [
+      { start: 16384L, end: 20480L, },
+    ])
+    assert_true(!@fs.exists(output + ".mfl"))
+    let rebuilt = @host.adopt_with_reference(reference, output)
+    assert_eq(rebuilt.to_json(), independently_audited.to_json())
+    assert_eq(@fs.read_file(output).binary(), damaged_without_checkpoint)
+    assert_eq(@fs.read_file(reference_path).binary(), reference_bytes)
+    assert_eq(requested.length(), requests_before)
+    assert_eq(wire_requests, wire_before_reference)
+    let reference_repaired = reopened.receive(output, parallel=1)
+    assert_true(reference_repaired.complete)
+    assert_eq(reference_repaired.recovery.retained_bytes, 23912L)
+    assert_eq(reference_repaired.downloaded_blocks, 1)
+    assert_eq(requested, [2, 2, 1, 5, 4])
+    assert_eq(full_gets, 1)
+    assert_eq(@fs.read_file(output).binary(), data)
+    println(
+      "difference proof: lost local checkpoint + damaged file; ordinary adoption refused; pinned reference rebuilt 23912 valid bytes without content writes or requests; upstream WebDAV repaired exactly [16384,20480); full downloads remain 1",
+    )
     let saved = @fs.read_file(output + ".mfl").binary()
     let (stopped, _) = @http.get(origin + "/stop")
     assert_eq(stopped.code, 200)

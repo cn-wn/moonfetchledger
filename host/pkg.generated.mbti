@@ -9,6 +9,8 @@ import {
 // Values
 pub async fn adopt(@moonfetchledger.ObjectSpec, String, chunk_size? : Int) -> Unit
 
+pub async fn adopt_with_reference(@moonfetchledger.BlockReference, String) -> AuditReport
+
 pub async fn audit(@moonfetchledger.ObjectSpec, String) -> AuditReport
 
 pub async fn audit_with_reference(@moonfetchledger.BlockReference, String) -> AuditReport

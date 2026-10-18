@@ -3,6 +3,9 @@
 `cn-wn/moonfetchledger` is a MoonBit block-integrity audit and repair layer for
 existing download clients. It reconciles actual fixed-block coverage, detects
 same-size content damage and preserves valid blocks during selective repair.
+Independently pinned block references also recover valid coverage when a file is
+already damaged and its local checkpoint is missing. See the
+[reproducible difference proof](docs/differentiation-proof.md).
 
 The native [WebDAV integration](docs/webdav.md) extends the published
 [q2316367743/webdav](https://github.com/q2316367743/webdav) client: the upstream
@@ -34,6 +37,9 @@ downloads, authentication and progress are shared capabilities, not novelty clai
 - [Pinned complete block references](docs/block-reference.md): publish records
   after whole-source verification and audit unmanaged damaged files without local
   checkpoints, networking or sidecar creation.
+- Reference-based adoption of damaged/truncated existing files: create a new
+  checkpoint from actual matching blocks, preserve content and existing metadata,
+  then repair through the existing client or local-backup workflow.
 - Verified local-file adoption: bounded storage indexing, whole-digest gating,
   new recovery checkpoint and later selective repair without changing original bytes.
 - Verified export to a new ready-to-use path: source reconciliation, copied-byte
@@ -70,6 +76,10 @@ it using an independent trusted digest, detects one changed byte without network
 retains 23912 of 28008 bytes, and repairs just that block through WebDAV. It also
 checks encoded-response refusal, two nonadjacent bad blocks across pause/reopen,
 verified export and zero-fetch reuse after the origin stops. The loopback fixture
+also checks the upstream's length-based 416 resume boundary, removes local metadata,
+rebuilds 23912 valid bytes from a pinned reference without content/network writes,
+and repairs only [16384,20480) while retaining the original single full download.
+The fixture
 implements only PUT/GET/OPTIONS; vendor WebDAV server compatibility is not claimed.
 
 ## Run the recovery example

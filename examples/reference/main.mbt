@@ -47,7 +47,19 @@ async fn main {
     _ => fail("accepted untrusted reference bytes")
   }
   assert_eq(@fs.read_file(metadata).binary(), before)
+  let rebuilt = @host.adopt_with_reference(reference, path)
+  assert_eq(rebuilt.to_json(), audit.to_json())
+  assert_eq(@fs.read_file(path).binary(), damaged)
+  assert_eq(@host.audit(spec, path).confirmed_bytes, 23912L)
+  let repaired = @host.repair_from_local(spec, path, publisher)
+  assert_true(repaired.complete)
+  assert_eq(repaired.recovery.retained_bytes, 23912L)
+  assert_eq(repaired.repaired_blocks, 1)
+  assert_eq(@fs.read_file(path).binary(), data)
+  assert_eq(@fs.read_file(metadata).binary(), before)
+  @host.export_verified(spec, path, dir + "/ready.csv")
+  assert_eq(@fs.read_file(dir + "/ready.csv").binary(), data)
   println(
-    "pinned reference audit verified: whole-source-gated publication, same-size damage without local checkpoint, retained=23912, one bad block, deterministic read-only report and no sidecar creation",
+    "pinned reference workflow verified: immutable publication, same-size damage without local checkpoint, read-only audit retaining=23912, new sparse checkpoint without artifact writes, one-block offline repair and verified export",
   )
 }

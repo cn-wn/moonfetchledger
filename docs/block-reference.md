@@ -49,9 +49,26 @@ preserve inputs; publication cleans only its own temporary through no-replacemen
 publication. Upstream clients that do not use the ledger lock must be serialized
 with these operations by their application.
 
-This milestone provides publication and read-only inspection. Existing managed
-sessions already support WebDAV/local repair. Creating a new repair session for
-damaged unmanaged content is a separate next capability.
+## Create a new recovery session from damaged storage
+
+    let rebuilt = @host.adopt_with_reference(reference, "installed.bin")
+    // The artifact bytes are unchanged; only independently matching blocks persist.
+    let repaired = source.receive("installed.bin") // Existing WebDAV Source
+
+adopt_with_reference requires an existing regular artifact, obtains an exclusive
+cooperative lock and performs the same reference audit. It publishes a NEW MFL1
+checkpoint containing only blocks whose actual readback matched the authenticated
+reference. Damaged and truncated files are supported; extra bytes are refused.
+When all blocks match, whole-file SHA-256 must verify before publication. There
+are no network or artifact-content writes during this operation.
+
+Existing .mfl, .mfl.next and .mfl.recovering files are never replaced or consumed.
+Preserve existing metadata and use its normal recovery path instead. An existing
+regular .mfl.lock is retained, or a new one is created; the lock may remain after
+an error. The checkpoint uses exclusive temporary creation and no-replacement
+publication. The reference layout controls chunk size; callers cannot override it.
+Resume through existing receive, HTTP, WebDAV or local-backup repair APIs, which
+recheck saved records before writing. Normal complete-file adoption is unchanged.
 
 Run the network-free real-data example:
 
@@ -60,5 +77,9 @@ Run the network-free real-data example:
 It publishes full records from the bundled 28008-byte USGS snapshot, damages one
 byte in an unmanaged copy, reports only [8192,12288) as invalid and 23912 retained
 bytes, repeats the audit, refuses a wrong pin, and verifies unchanged artifact/
-metadata bytes and no sidecar creation. Licenses are recorded in
+metadata bytes and no sidecar creation during audit. It then creates a partial
+checkpoint without changing damaged content, repairs exactly one block from the
+verified publisher copy and exports the result. For actual upstream-client
+repair after loss of local metadata, run examples/webdav and see the linked
+[differentiation evidence](differentiation-proof.md). Licenses are recorded in
 THIRD_PARTY_NOTICES.md and fixtures/README.md.

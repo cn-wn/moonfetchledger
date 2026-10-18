@@ -24,7 +24,7 @@ Linux moon: `a31026b83410607909ebae469fa19e46c32201cfe403be6099e1da961a5ebf0f`.
   boundary tests, read-only auditing, shared/exclusive lock interaction and
   whole-file integrity, adoption, export, repair, progress, pause, authentication,
   pinned manifests, interrupted checkpoint recovery and source/WebDAV integration
-  (89 total on native, including the checked WebDAV usage example).
+  (93 total on native, including the checked WebDAV usage example).
 - Coverage projection: all 128 confirmation masks for seven blocks, including
   reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
   return arrays, checkpoint preservation, restoration gate and maximum length.
@@ -175,6 +175,21 @@ existing lock cooperation, missing-lock refusal, destination/temporary/alias
 preservation, 16000000-byte acceptance and 16000001-byte rejection, and final
 digest failure despite matching block records. The real-data reference example
 requires no network or private infrastructure.
+
+Reference adoption tests rebuild all eight three-block actual coverage masks,
+preserve artifact/reference bytes, compare exact canonical checkpoints and repair
+only remaining blocks through the unchanged local-backup API. Existing metadata
+and temporary files, absent/directory/extra artifacts, wrong complete digests,
+nonregular locks and competing shared locks are refused; retry, truncated/empty
+artifacts and original lock contents are verified. The reference example now
+continues from read-only audit to new checkpoint, one-block repair and export.
+The actual WebDAV fixture additionally invokes upstream length-based resume on
+a same-size corrupt file (valid 416/total reply), observes unchanged damage,
+checks ordinary adoption refusal, and rebuilds lost local progress from the
+independently pinned publisher reference. Both artifact bytes and all HTTP request
+counts stay unchanged during audit/rebuild. Exactly [16384,20480) is then fetched;
+23912 bytes survive and full-download count remains one. This is a comparison of
+the pinned upstream API contract, not an ecosystem-wide absence/performance claim.
 
 Upstream async C stubs produced GCC's ignored-return-value warning and MSVC's
 EINVAL macro-redefinition warning; project

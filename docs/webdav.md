@@ -36,6 +36,14 @@ budget or shared `PauseSignal` drains/saves the current batch and permits a late
 call with a newly constructed Source/rotated credentials. Complete reopen makes
 zero requests. Audit, checkpoint recovery, local-backup repair and export retain
 their existing host APIs and on-disk format.
+When local progress is missing but an independently authenticated complete block
+reference exists, audit_with_reference can inspect the damaged artifact without
+creating sidecars. adopt_with_reference creates a NEW checkpoint from actual
+matching blocks, after which the same Source.receive repairs only the gaps.
+Existing checkpoints and temporaries are refused. This extra trusted input is
+required; arbitrary damaged content still cannot establish its own block hashes.
+See [block references](block-reference.md) and the
+[actual upstream comparison](differentiation-proof.md).
 The upstream downloader does not acquire `.mfl.lock`: do not run it concurrently
 against an adopted output. Use the managed receive workflow or a new download
 path when changing the artifact; coordinate any other writer explicitly.
@@ -99,7 +107,14 @@ test endpoint implements only PUT/GET/OPTIONS, not a full RFC 4918 server:
    single block through upstream range GET and verify full SHA-256.
 4. Damage two nonadjacent blocks; pause after one repair and construct a fresh
    Source to repair only the remaining one. Export a byte-identical artifact.
-5. Stop the endpoint and reuse complete coverage with zero further downloads.
+5. Delete the demonstration checkpoint and change one byte without changing length.
+   Call upstream download_to_path_resume: a valid 416 with equal total length
+   returns successfully while content remains damaged, matching its prefix contract.
+   Ordinary full-file adoption refuses the digest mismatch. Independently pinned
+   block records audit/rebuild a sparse checkpoint retaining 23912 bytes with no
+   artifact writes or requests. The same Source then repairs exactly [16384,20480),
+   while full-download count remains one.
+6. Stop the endpoint and reuse complete coverage with zero further downloads.
 
 Tests additionally cover all eight three-block coverage masks, short final blocks,
 preflight integer/URL/auth/timeout boundaries, conditional/auth request headers,
