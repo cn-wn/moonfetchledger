@@ -11,9 +11,13 @@ pub async fn adopt(@moonfetchledger.ObjectSpec, String, chunk_size? : Int) -> Un
 
 pub async fn audit(@moonfetchledger.ObjectSpec, String) -> AuditReport
 
+pub async fn audit_with_reference(@moonfetchledger.BlockReference, String) -> AuditReport
+
 pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int, max_attempts? : Int, retry_delay_ms? : Int, request_timeout_ms? : Int, on_progress? : async (DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal, auth? : BearerAuth) -> DownloadReport
 
 pub async fn export_verified(@moonfetchledger.ObjectSpec, String, String) -> Unit
+
+pub async fn load_block_reference(@moonfetchledger.ObjectSpec, String, String) -> @moonfetchledger.BlockReference
 
 pub async fn load_manifest(String, String) -> @moonfetchledger.ObjectSpec
 
@@ -22,6 +26,8 @@ pub async fn receive_from(@moonfetchledger.ObjectSpec, String, fetch_range~ : as
 pub async fn recover_checkpoint(@moonfetchledger.ObjectSpec, String) -> AuditReport
 
 pub async fn repair_from_local(@moonfetchledger.ObjectSpec, String, String, stop_after_blocks? : Int, on_progress? : async (LocalRepairProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> LocalRepairReport
+
+pub async fn write_block_reference(@moonfetchledger.ObjectSpec, String, String, chunk_size? : Int) -> String
 
 pub async fn write_manifest(@moonfetchledger.ObjectSpec, String) -> String
 

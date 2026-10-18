@@ -25,6 +25,15 @@ pub suberror LedgerError {
 pub fn LedgerError::to_repr(Self) -> @debug.Repr
 
 // Types and methods
+pub struct BlockReference {
+  spec : ObjectSpec
+  chunk_size : Int
+  // private fields
+}
+pub fn BlockReference::from_bytes(Bytes, String, ObjectSpec) -> Self raise LedgerError
+pub fn BlockReference::session(Self) -> Session raise LedgerError
+pub fn BlockReference::to_checkpoint(Self) -> String
+
 pub(all) struct ByteRange {
   start : Int64
   end : Int64
@@ -91,6 +100,7 @@ pub fn Session::verify_complete(Self, (ByteRange) -> Bytes raise) -> Unit raise
 pub struct StorageIndexer {
   // private fields
 }
+pub fn StorageIndexer::block_reference(Self) -> BlockReference raise LedgerError
 pub fn StorageIndexer::finish(Self) -> Session raise LedgerError
 pub fn StorageIndexer::new(ObjectSpec, chunk_size? : Int) -> Self raise LedgerError
 pub fn StorageIndexer::next_range(Self) -> ByteRange?

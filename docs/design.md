@@ -107,7 +107,11 @@ the demo serves the bundled public-domain USGS snapshot over loopback.
 - Implemented: existing WebDAV client integration, shared source-independent
   storage recovery, guarded range consumption and audit/repair after upstream
   download/adoption, including same-size corruption and nonadjacent gaps.
+- Implemented: complete block references, whole-source-gated publication, portable
+  pin-before-parse loading and read-only native audit of unmanaged damaged files.
 - Planned: signed release metadata integration beyond independent SHA-256 pins.
+- Planned: reconstruct repair checkpoints from independently pinned complete
+  block references when an unmanaged file is already damaged.
 - Planned: independent browser storage adapter with the same receive contract;
   versioned checkpoint migrations only when a concrete schema extension is needed.
 

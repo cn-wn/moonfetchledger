@@ -53,6 +53,7 @@ async fn main {
   checked(["run", "scripts/local_storage_demo.mbtx"])
   checked(["run", "--target", "native", "examples/controlled"])
   checked(["run", "--target", "native", "examples/webdav"])
+  checked(["run", "--target", "native", "examples/reference"])
   checked(["run", "scripts/auth_demo.mbtx"])
   checked(["run", "scripts/manifest_demo.mbtx"])
   checked(["run", "scripts/checkpoint_recovery_demo.mbtx"])

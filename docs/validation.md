@@ -1,4 +1,4 @@
-# Validation record — 2026-10-17
+# Validation record — 2026-10-19
 
 Stable download channel binaries match the local version:
 
@@ -17,14 +17,14 @@ Linux moon: `a31026b83410607909ebae469fa19e46c32201cfe403be6099e1da961a5ebf0f`.
 
 - Ubuntu/WSL, GCC 12.5: actual four-target tests, native assembly and integration
   examples. Windows local tooling is used for strict checks and API discovery.
-- 27 tests per portable target, including the checked README. Generated property cases cover
+- 33 tests per portable target, including the checked README. Generated property cases cover
   129 binary sizes x 4 block sizes (516 complete reception/recovery round trips).
 - Native host adds response-range validation, preservation of unrelated/extra
   data, exclusive-lock/reopen, checkpoint preservation and retry-budget/wait-hint
   boundary tests, read-only auditing, shared/exclusive lock interaction and
   whole-file integrity, adoption, export, repair, progress, pause, authentication,
   pinned manifests, interrupted checkpoint recovery and source/WebDAV integration
-  (79 total on native, including the checked WebDAV usage example).
+  (89 total on native, including the checked WebDAV usage example).
 - Coverage projection: all 128 confirmation masks for seven blocks, including
   reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
   return arrays, checkpoint preservation, restoration gate and maximum length.
@@ -141,7 +141,7 @@ the EOF probe reads at most one additional byte. The real-data local storage dem
 also checks CLI refusal/preservation across receive, audit, local repair and export.
 
 The complete verification script passed in a Linux-local snapshot,
-with all 101 project files compared byte-for-byte against the original working
+with the project inventory compared byte-for-byte against the original working
 tree before and after validation. In the Windows-mounted checkout the manifest
 workflow reached the existing 180-second subprocess budget; the Linux-local run
 kept that budget and completed all stages. Use a Linux-local checkout when a
@@ -165,6 +165,16 @@ single trailing CR before checking canonical JSON; both LF and CRLF are tested
 against explicit expected records. Run `moon run scripts/local_storage_demo.mbtx
 --check-progress-lines` to check this parser without a native C compiler, or omit
 the option to run the full actual-file workflow.
+
+Pinned block references add 195 binary size/layout round trips, canonical MFL1
+equivalence, all eight three-block partial-reference masks and local corruption
+masks, independent recovery sessions, wrong/incomplete whole-source refusal,
+pin-before-UTF-8/schema checks, identity mismatch and byte bounds. Native tests
+cover unmanaged/truncated/absent/extra files, no-sidecar read-only behavior,
+existing lock cooperation, missing-lock refusal, destination/temporary/alias
+preservation, 16000000-byte acceptance and 16000001-byte rejection, and final
+digest failure despite matching block records. The real-data reference example
+requires no network or private infrastructure.
 
 Upstream async C stubs produced GCC's ignored-return-value warning and MSVC's
 EINVAL macro-redefinition warning; project

@@ -31,6 +31,9 @@ downloads, authentication and progress are shared capabilities, not novelty clai
   version, representation and storage errors still fail immediately.
 - Offline native audit and deterministic JSON reports: actual disk readback,
   corrupt/missing block detection, coalesced gap planning and final integrity check.
+- [Pinned complete block references](docs/block-reference.md): publish records
+  after whole-source verification and audit unmanaged damaged files without local
+  checkpoints, networking or sidecar creation.
 - Verified local-file adoption: bounded storage indexing, whole-digest gating,
   new recovery checkpoint and later selective repair without changing original bytes.
 - Verified export to a new ready-to-use path: source reconciliation, copied-byte
