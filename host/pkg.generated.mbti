@@ -7,7 +7,7 @@ import {
 }
 
 // Values
-pub async fn adopt(@moonfetchledger.ObjectSpec, String, chunk_size? : Int) -> Unit
+pub async fn adopt(@moonfetchledger.ObjectSpec, String, chunk_size? : Int32) -> Unit
 
 pub async fn adopt_with_reference(@moonfetchledger.BlockReference, String) -> AuditReport
 
@@ -15,7 +15,7 @@ pub async fn audit(@moonfetchledger.ObjectSpec, String) -> AuditReport
 
 pub async fn audit_with_reference(@moonfetchledger.BlockReference, String) -> AuditReport
 
-pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int, max_attempts? : Int, retry_delay_ms? : Int, request_timeout_ms? : Int, on_progress? : async (DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal, auth? : BearerAuth) -> DownloadReport
+pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int32, parallel? : Int32, stop_after_blocks? : Int32, max_attempts? : Int32, retry_delay_ms? : Int32, request_timeout_ms? : Int32, on_progress? : async (DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal, auth? : BearerAuth) -> DownloadReport
 
 pub async fn export_verified(@moonfetchledger.ObjectSpec, String, String) -> Unit
 
@@ -23,13 +23,13 @@ pub async fn load_block_reference(@moonfetchledger.ObjectSpec, String, String) -
 
 pub async fn load_manifest(String, String) -> @moonfetchledger.ObjectSpec
 
-pub async fn receive_from(@moonfetchledger.ObjectSpec, String, fetch_range~ : async (@moonfetchledger.ByteRange) -> ReceivedBlock, chunk_size? : Int, parallel? : Int, stop_after_blocks? : Int, on_progress? : async (DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> DownloadReport
+pub async fn receive_from(@moonfetchledger.ObjectSpec, String, fetch_range~ : async (@moonfetchledger.ByteRange) -> ReceivedBlock, chunk_size? : Int32, parallel? : Int32, stop_after_blocks? : Int32, on_progress? : async (DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> DownloadReport
 
 pub async fn recover_checkpoint(@moonfetchledger.ObjectSpec, String) -> AuditReport
 
-pub async fn repair_from_local(@moonfetchledger.ObjectSpec, String, String, stop_after_blocks? : Int, on_progress? : async (LocalRepairProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> LocalRepairReport
+pub async fn repair_from_local(@moonfetchledger.ObjectSpec, String, String, stop_after_blocks? : Int32, on_progress? : async (LocalRepairProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> LocalRepairReport
 
-pub async fn write_block_reference(@moonfetchledger.ObjectSpec, String, String, chunk_size? : Int) -> String
+pub async fn write_block_reference(@moonfetchledger.ObjectSpec, String, String, chunk_size? : Int32) -> String
 
 pub async fn write_manifest(@moonfetchledger.ObjectSpec, String) -> String
 
@@ -39,7 +39,7 @@ pub suberror HostError {
   InvalidResponse(String)
   CheckpointTooLarge
   OutputLocked
-  RetryExhausted(@moonfetchledger.ByteRange, Int, String)
+  RetryExhausted(@moonfetchledger.ByteRange, Int32, String)
 } derive(@debug.Debug)
 pub fn HostError::to_repr(Self) -> @debug.Repr
 
@@ -72,7 +72,7 @@ pub struct DownloadProgress {
   phase : DownloadPhase
   total_bytes : Int64
   confirmed_bytes : Int64
-  downloaded_blocks : Int
+  downloaded_blocks : Int32
 } derive(@debug.Debug)
 pub fn DownloadProgress::to_json(Self) -> Json
 pub fn DownloadProgress::to_repr(Self) -> @debug.Repr
@@ -80,7 +80,7 @@ pub fn DownloadProgress::to_repr(Self) -> @debug.Repr
 pub struct DownloadReport {
   complete : Bool
   confirmed_bytes : Int64
-  downloaded_blocks : Int
+  downloaded_blocks : Int32
   recovery : @moonfetchledger.RecoveryReport
 } derive(@debug.Debug)
 pub fn DownloadReport::to_repr(Self) -> @debug.Repr
@@ -97,7 +97,7 @@ pub struct LocalRepairProgress {
   phase : LocalRepairPhase
   total_bytes : Int64
   confirmed_bytes : Int64
-  repaired_blocks : Int
+  repaired_blocks : Int32
 } derive(@debug.Debug)
 pub fn LocalRepairProgress::to_json(Self) -> Json
 pub fn LocalRepairProgress::to_repr(Self) -> @debug.Repr
@@ -105,14 +105,14 @@ pub fn LocalRepairProgress::to_repr(Self) -> @debug.Repr
 pub struct LocalRepairReport {
   complete : Bool
   confirmed_bytes : Int64
-  repaired_blocks : Int
+  repaired_blocks : Int32
   recovery : @moonfetchledger.RecoveryReport
 } derive(@debug.Debug)
 pub fn LocalRepairReport::to_repr(Self) -> @debug.Repr
 
 pub(all) struct ReceivedBlock {
   bytes : Bytes
-  status : Int
+  status : Int32
   etag : String
   range : @moonfetchledger.ByteRange
   total : Int64

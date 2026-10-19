@@ -124,3 +124,10 @@ on Linux, macOS and Windows CI. Test results and actual platform evidence belong
 in [validation.md](validation.md); configuration is not proof of a passing run.
 
 Sources and licenses: [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
+
+An additional [WsgiDAV/Cheroot integration](../integration/README.md) runs an
+unmodified external server with pinned public test dependencies. It checks real
+PROPFIND, HTTP ETag, upstream full download, reference-based one-block repair,
+verified export and actual stale If-Match 412 refusal. Its separate Linux CI job
+complements the finite fixture; this is one server configuration, not general
+vendor certification.

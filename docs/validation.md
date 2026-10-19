@@ -1,19 +1,33 @@
 # Validation record — 2026-10-19
 
-Stable download channel binaries match the local version:
+The updated local Linux validation uses the same current stable version observed
+in CI (the initial local run used 2026-10-12):
 
 ```text
-moon 0.1.20261012 (748b63c 2026-10-12)
-moonc v0.10.15+943464bfa (2026-10-12)
-moonrun 0.1.20261012
+moon 0.1.20261016 (1af328f 2026-10-16)
+moonc v0.10.16+b1a0e846e (2026-10-16)
+moonrun 0.1.20261016
 ```
 
-The Windows and Linux moon executables match the official latest checksum lists:
-https://cli.moonbitlang.com/binaries/latest/moonbit-windows-x86_64.sha256 and
-https://cli.moonbitlang.com/binaries/latest/moonbit-linux-x86_64.sha256 .
-The isolated Linux toolchain reports the same compiler/build-tool versions.
-Windows moon SHA-256: `296a895d934b6a07522214cbf89caf0cf5605efe4fb82efe07b929fbf9d27432`;
-Linux moon: `a31026b83410607909ebae469fa19e46c32201cfe403be6099e1da961a5ebf0f`.
+Linux moon SHA-256 matches the freshly fetched official latest checksum list:
+https://cli.moonbitlang.com/binaries/latest/moonbit-linux-x86_64.sha256 :
+`04e3761068089c8f0d0c549aa6a46a81f21ec6360c34ec5803a97ad8ca711797`.
+Three generated interfaces were regenerated with this compiler: it now prints
+Int32 where the previous compiler printed Int for the same source declarations.
+No handwritten interface normalization or relaxed drift check is used.
+
+The first latest-toolchain CI run (39258086588) caught that interface drift on
+Unix and failed during the official Windows installer's core bundle with
+Sys_error("\\\\?: Invalid argument"). The same Windows compiler/core bundled
+successfully in an isolated local directory, so the runner failure's root cause
+is not established. Windows-2022 also failed with short C:/moon (39259788778)
+and D:/mfl-moon on the checkout's drive (39260230927); changing the install root
+did not resolve it. Windows CI now selects the current Windows Server 2025 /
+Visual Studio 2026 image and its documented Visual Studio 18 installation path:
+https://github.com/actions/runner-images/blob/main/images/windows/Windows2025-VS2026-Readme.md .
+It keeps D:/mfl-moon and the current compiler, without downgrading or wrapping it.
+Its actual remote result must be checked independently; local Windows bundling
+alone proves no native execution. Windows-2022 is not currently verified.
 
 - Ubuntu/WSL, GCC 12.5: actual four-target tests, native assembly and integration
   examples. Windows local tooling is used for strict checks and API discovery.
@@ -98,7 +112,7 @@ Linux moon: `a31026b83410607909ebae469fa19e46c32201cfe403be6099e1da961a5ebf0f`.
 
 The default Windows machine has no MSVC SDK. Windows native execution is not
 claimed as locally verified. The official async dependency requires MSVC on Windows;
-MinGW is not a supported substitute. CI uses the Windows-2022 MSVC environment,
+MinGW is not a supported substitute. CI uses the Windows-2025 / VS 2026 MSVC environment,
 plus Linux and macOS. CI status must be checked after pushing; configuration alone
 is not evidence of success.
 
@@ -182,6 +196,21 @@ original publisher reference. Mode conflicts, duplicate adoption, missing/bad pi
 all existing checkpoint/temporary kinds and extra artifact data are refused;
 artifact and unrelated metadata preservation plus retry after correction are
 checked through actual CLI commands.
+
+The optional external-server workflow passed on Ubuntu/WSL with Python 3.13.13,
+WsgiDAV 4.3.5 and Cheroot 11.1.2 (all eleven dependency versions pinned). It starts
+the unmodified server against a disposable loopback share. A wrong ownership
+marker is refused before the workflow and leaves the shared fixture unchanged;
+the correct marker then permits real upstream PROPFIND, one-byte metadata range
+GET and a full download. Pinned-reference reconstruction retains 23912 bytes,
+Source.receive repairs only [8192,12288), complete checkpoint bytes equal the
+reference, and verified export equals the fixture. A different-length PUT changes
+the actual server ETag; stale If-Match returns HTTP 412 through the upstream API,
+and the ledger source refuses the next damaged block without artifact writes.
+Server process and temporary directories are cleaned up after completion. See
+[integration/README.md](../integration/README.md) for exact commands, licenses,
+limitations and the separate Ubuntu CI job. This local execution is not evidence
+for Windows/macOS external-server interoperability or other WebDAV products.
 
 Pinned block references add 195 binary size/layout round trips, canonical MFL1
 equivalence, all eight three-block partial-reference masks and local corruption

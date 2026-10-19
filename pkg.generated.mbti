@@ -27,7 +27,7 @@ pub fn LedgerError::to_repr(Self) -> @debug.Repr
 // Types and methods
 pub struct BlockReference {
   spec : ObjectSpec
-  chunk_size : Int
+  chunk_size : Int32
   // private fields
 }
 pub fn BlockReference::from_bytes(Bytes, String, ObjectSpec) -> Self raise LedgerError
@@ -80,15 +80,15 @@ pub fn RecoveryReport::to_repr(Self) -> @debug.Repr
 
 pub struct Session {
   spec : ObjectSpec
-  chunk_size : Int
+  chunk_size : Int32
   // private fields
 }
 pub fn Session::checkpoint(Self) -> String raise LedgerError
 pub fn Session::commit_written(Self, PreparedChunk, Bytes) -> Unit raise LedgerError
 pub fn Session::confirmed_bytes(Self) -> Int64
 pub fn Session::finish_recovery(Self) -> Unit raise LedgerError
-pub fn Session::new(ObjectSpec, chunk_size? : Int) -> Self raise LedgerError
-pub fn Session::prepare_chunk(Self, Lease, Bytes, status~ : Int, etag~ : String, range~ : ByteRange, total~ : Int64, content_encoding? : String) -> PreparedChunk raise LedgerError
+pub fn Session::new(ObjectSpec, chunk_size? : Int32) -> Self raise LedgerError
+pub fn Session::prepare_chunk(Self, Lease, Bytes, status~ : Int32, etag~ : String, range~ : ByteRange, total~ : Int64, content_encoding? : String) -> PreparedChunk raise LedgerError
 pub fn Session::reconcile_block(Self, ByteRange, Bytes?) -> Bool raise LedgerError
 pub fn Session::recovery_ranges(Self) -> Array[ByteRange]
 pub fn Session::release(Self, Lease) -> Unit raise LedgerError
@@ -102,7 +102,7 @@ pub struct StorageIndexer {
 }
 pub fn StorageIndexer::block_reference(Self) -> BlockReference raise LedgerError
 pub fn StorageIndexer::finish(Self) -> Session raise LedgerError
-pub fn StorageIndexer::new(ObjectSpec, chunk_size? : Int) -> Self raise LedgerError
+pub fn StorageIndexer::new(ObjectSpec, chunk_size? : Int32) -> Self raise LedgerError
 pub fn StorageIndexer::next_range(Self) -> ByteRange?
 pub fn StorageIndexer::prepare_repair(Self, Session, Lease, Bytes) -> PreparedChunk raise LedgerError
 pub fn StorageIndexer::push(Self, Bytes) -> Unit raise LedgerError

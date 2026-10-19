@@ -1,0 +1,18 @@
+import {
+  "cn-wn/moonfetchledger" @ledger,
+  "cn-wn/moonfetchledger/host",
+  "cn-wn/moonfetchledger/webdav" @dav,
+  "q2316367743/webdav" @upstream,
+  "q2316367743/webdav/types" @dav_types,
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/core/env",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/string" @strconv,
+}
+
+pkgtype(kind: "executable")
+
+options(
+  supported_targets: "native",
+)

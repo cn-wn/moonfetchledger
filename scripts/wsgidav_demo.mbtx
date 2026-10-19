@@ -1,0 +1,122 @@
+///|
+import {
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/process",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/async@0.22.4/socket",
+  "moonbitlang/core/env",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x@0.5.5/crypto",
+}
+
+///|
+async fn ready(server : @process.Process, address : @socket.Addr) -> Unit {
+  for _ in 0..<100 {
+    if server.try_wait() is Some(code) {
+      fail("WsgiDAV exited before readiness: \{code}")
+    }
+    let connected = @async.with_timeout_opt(200, () => {
+      try @socket.Tcp::connect(address) catch {
+        _ => false
+      } noraise {
+        socket => {
+          socket.close()
+          true
+        }
+      }
+    })
+    if connected == Some(true) {
+      return
+    }
+    @async.sleep(100)
+  }
+  fail(
+    "WsgiDAV did not open the loopback port within the bounded readiness window",
+  )
+}
+
+///|
+async fn main {
+  let executable = @env.get_env_var("MFL_WSGIDAV").unwrap_or("wsgidav")
+  let version = @shell.Cmd(executable, ["--version"]).output(timeout_ms=10000)
+  version.check()
+  assert_eq(version.stdout().trim().to_owned(), "4.3.5")
+  @shell.Cmd("moon", ["build", "--target", "native", "--deny-warn"]).run(
+    timeout_ms=120000,
+  )
+  let dir = @fs.tmpdir(prefix="moonfetchledger-wsgidav-server-")
+  defer @fs.rmdir(dir, recursive=true)
+  let share = dir + "/share"
+  @fs.mkdir(share)
+  let owner = @crypto.bytes_to_hex_string(@crypto.sha256(@utf8.encode(dir)))
+  @fs.write_file(share + "/mfl-owner-" + owner + ".txt", owner)
+  @fs.write_file(
+    share + "/earthquakes.csv",
+    @fs.read_file("fixtures/earthquakes-2024-01-01.csv"),
+  )
+  let listener = @socket.TcpServer::TcpServer(
+    @socket.Addr::parse("127.0.0.1:0"),
+  )
+  let address = listener.addr
+  listener.close()
+  let log_path = dir + "/server.log"
+  let log = @process.redirect_to_file(log_path)
+  defer log.close()
+  errdefer println("WsgiDAV diagnostic log:\n" + @fs.read_file(log_path).text())
+  @async.with_task_group(group => {
+    let server = @process.spawn(
+      group,
+      executable,
+      [
+        "--host=127.0.0.1",
+        "--port=\{address.port()}",
+        "--root=" + share,
+        "--auth=anonymous",
+        "--server=cheroot",
+        "--no-config",
+      ],
+      stdout=log,
+      stderr=log,
+      no_console_window=true,
+      no_wait=true,
+    )
+    defer server.cancel()
+    ready(server, address)
+    let wrong_owner = (if owner.has_prefix("a") { "b" } else { "a" }) +
+      owner[1:].to_owned()
+    let refused = @shell.Cmd("moon", [
+      "run",
+      "--target",
+      "native",
+      "--deny-warn",
+      "examples/wsgidav",
+      "--",
+      address.port().to_string(),
+      wrong_owner,
+    ]).output(timeout_ms=120000)
+    assert_true(refused.exit_code() != 0)
+    assert_true(
+      (refused.stdout() + refused.stderr()).contains(
+        "ownership marker unavailable",
+      ),
+    )
+    assert_eq(
+      @fs.read_file(share + "/earthquakes.csv").binary(),
+      @fs.read_file("fixtures/earthquakes-2024-01-01.csv").binary(),
+    )
+    @shell.Cmd("moon", [
+      "run",
+      "--target",
+      "native",
+      "--deny-warn",
+      "examples/wsgidav",
+      "--",
+      address.port().to_string(),
+      owner,
+    ]).run(timeout_ms=120000)
+  })
+  println(
+    "External server process stopped; disposable share and client files removed",
+  )
+}

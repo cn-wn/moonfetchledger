@@ -35,7 +35,7 @@ async fn main {
   checked([
     "fmt", "--check", "scripts/verify.mbtx", "scripts/recovery_demo.mbtx", "scripts/local_storage_demo.mbtx",
     "scripts/auth_demo.mbtx", "scripts/manifest_demo.mbtx", "scripts/checkpoint_recovery_demo.mbtx",
-    "scripts/reference_demo.mbtx", "scripts/reference_recovery_demo.mbtx",
+    "scripts/reference_demo.mbtx", "scripts/reference_recovery_demo.mbtx", "scripts/wsgidav_demo.mbtx",
   ])
   checked(["info"])
   checked(["info", "--target", "native"])

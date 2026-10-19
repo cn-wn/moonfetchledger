@@ -44,6 +44,9 @@ downloads, authentication and progress are shared capabilities, not novelty clai
 - Reference-based adoption of damaged/truncated existing files: create a new
   checkpoint from actual matching blocks, preserve content and existing metadata,
   then repair through the existing client or local-backup workflow.
+- [Real-server integration](integration/README.md): a separate reproducible
+  WsgiDAV/Cheroot test using the published WebDAV client for PROPFIND, conditional
+  ranges, checkpoint-free damage recovery and changed-version refusal.
 - Verified local-file adoption: bounded storage indexing, whole-digest gating,
   new recovery checkpoint and later selective repair without changing original bytes.
 - Verified export to a new ready-to-use path: source reconciliation, copied-byte

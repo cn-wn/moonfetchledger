@@ -1,0 +1,12 @@
+# Optional real-server integration only; not MoonBit runtime dependencies.
+WsgiDAV==4.3.5
+cheroot==11.1.2
+bcrypt==4.3.0
+defusedxml==0.7.1
+jaraco.functools==4.6.0
+Jinja2==3.1.6
+json5==0.17.3
+MarkupSafe==3.0.4
+more-itertools==11.2.1
+passlib==1.7.4
+PyYAML==6.0.3
