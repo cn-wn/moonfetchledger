@@ -6,16 +6,17 @@ fn reference_options(values : Map[String, String]) -> Bool {
 }
 
 ///|
-// A complete independent publisher/auditor workflow, separate from saved local
-// progress. Validate every option before publication or artifact-sidecar access.
+// Explicit offline publication, inspection or NEW checkpoint adoption. Validate
+// every option before publication or artifact-sidecar access.
 async fn reference_command(
   spec : @ledger.ObjectSpec,
   values : Map[String, String],
   auditing~ : Bool,
+  adopting_reference~ : Bool,
 ) -> Unit {
   if values.get("--write-block-reference") is Some(destination) {
-    if auditing {
-      fail("--write-block-reference cannot be combined with --audit")
+    if auditing || adopting_reference {
+      fail("--write-block-reference cannot be combined with audit or adoption")
     }
     for key, _ in values {
       if !identity_option(key) &&
@@ -39,14 +40,16 @@ async fn reference_command(
       "--block-reference and independently trusted --block-reference-sha256 are required together",
     )
   }
-  if !auditing {
-    fail("block reference input requires --audit")
+  if auditing == adopting_reference {
+    fail(
+      "block reference input requires exactly one of --audit or --adopt-with-reference",
+    )
   }
   for key, _ in values {
     if !identity_option(key) &&
       key != "--block-reference" &&
       key != "--block-reference-sha256" {
-      fail("option \{key} is unsupported with reference audit")
+      fail("option \{key} is unsupported with reference audit/adoption")
     }
   }
   let path = argument(values, "--block-reference")
@@ -56,9 +59,11 @@ async fn reference_command(
     argument(values, "--block-reference-sha256"),
   )
   protect_descriptor(path, values, "block reference")
-  println(
-    @host.audit_with_reference(reference, argument(values, "--output"))
-    .to_json()
-    .stringify(),
-  )
+  let output = argument(values, "--output")
+  let report = if adopting_reference {
+    @host.adopt_with_reference(reference, output)
+  } else {
+    @host.audit_with_reference(reference, output)
+  }
+  println(report.to_json().stringify())
 }

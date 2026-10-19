@@ -174,6 +174,15 @@ bad publisher source cannot publish metadata; a later valid publication recovers
 and yields identical bytes. The actual artifact and reference/identity descriptors
 are compared after refusal and audit, with no unmanaged sidecar creation.
 
+The reference recovery CLI additionally runs explicit adoption, one-block repair
+and export, then simulates a lost checkpoint and two separated damaged blocks.
+It reconstructs 19816 valid bytes, saves a one-block repair pause at 23912 bytes,
+and resumes in a fresh command process. Complete checkpoint bytes must equal the
+original publisher reference. Mode conflicts, duplicate adoption, missing/bad pins,
+all existing checkpoint/temporary kinds and extra artifact data are refused;
+artifact and unrelated metadata preservation plus retry after correction are
+checked through actual CLI commands.
+
 Pinned block references add 195 binary size/layout round trips, canonical MFL1
 equivalence, all eight three-block partial-reference masks and local corruption
 masks, independent recovery sessions, wrong/incomplete whole-source refusal,

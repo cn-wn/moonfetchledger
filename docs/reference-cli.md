@@ -37,9 +37,28 @@ artifact data, conflicting options and input descriptors aliasing artifact/sessi
 export/reference destination paths fail. Existing aliases resolvable with realpath
 are checked before artifact access; trusted-directory assumptions still apply.
 
-These commands publish and inspect. Creating a new recovery checkpoint for damaged
-content remains available through the library; CLI adoption is a separate next
-capability. Existing managed sessions use the ordinary repair/download commands.
+## Recover lost progress and repair
+
+    moon run --target native cmd/fetch -- --manifest release.json --manifest-sha256 IDENTITY_PIN --output installed.bin --adopt-with-reference --block-reference release.blocks.mfl --block-reference-sha256 REFERENCE_PIN
+    moon run --target native cmd/fetch -- --manifest release.json --manifest-sha256 IDENTITY_PIN --output installed.bin --repair-from publisher.bin --stop-after-blocks 1 --progress
+    moon run --target native cmd/fetch -- --manifest release.json --manifest-sha256 IDENTITY_PIN --output installed.bin --repair-from publisher.bin
+    moon run --target native cmd/fetch -- --manifest release.json --manifest-sha256 IDENTITY_PIN --output installed.bin --export-to ready.bin
+
+Adoption is explicit and exclusive with audit, publication, ordinary --adopt,
+repair, export, credentials and download policies. It reads an existing regular
+artifact, confirms only blocks matching the independently pinned reference, and
+creates a NEW .mfl checkpoint under an exclusive cooperating lock. Damaged or
+truncated content is accepted; extra bytes are refused without truncation. Artifact
+and release metadata bytes are never changed. Existing .mfl, .mfl.next and
+.mfl.recovering files are refused and preserved. A created lock may remain after a
+failed adoption; it conveys no verification authority.
+
+The emitted MFLAUDIT1 report describes the reconstructed coverage, not completion
+of repair. Continue with the ordinary repair/download API; no re-publication or
+reference input is needed. Local repair fully verifies the backup first, saves
+each copied block and can pause/restart in another process. Completion and export
+still require whole-file verification. Network repair uses the existing native
+download command or WebDAV Source.receive; this offline example needs no origin.
 
 Run the actual-file workflow on the bundled USGS data:
 
@@ -50,3 +69,12 @@ block retaining 23912 bytes under both identity input forms, refuses bad pins an
 mode/path conflicts without sidecar creation, preserves unrelated temporaries,
 rejects a damaged publisher source, and produces identical reference bytes on
 subsequent valid publication. The verification script runs it on all CI systems.
+
+    moon run scripts/reference_recovery_demo.mbtx
+
+This second actual-command workflow reconstructs 23912 valid bytes, repairs one
+4096-byte block and exports the verified artifact. It then removes only its own
+checkpoint, damages two separated blocks, reconstructs 19816 bytes, pauses after
+one saved repair and finishes in a fresh process. It compares complete checkpoints
+with the original reference byte-for-byte, preserves existing metadata on refusal,
+and retries successfully after correcting extra-data input. Both scripts run in CI.

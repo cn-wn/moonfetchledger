@@ -1,0 +1,181 @@
+///|
+import {
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/crypto",
+}
+
+///|
+fn hash(bytes : Bytes) -> String {
+  @crypto.bytes_to_hex_string(@crypto.sha256(bytes))
+}
+
+///|
+async fn invoke(path : String, extra : Array[String]) -> @shell.Output {
+  let args = [
+    "run", "--target", "native", "cmd/fetch", "--", "--url", "http://127.0.0.1:1/recovery",
+    "--output", path, "--length", "28008", "--etag", "\"fixture-v1\"", "--sha256",
+    "dca55780e807e6b6dc5dafe53a621bf99929681551ab85bb4a27f5142e208042",
+  ]
+  args.append(extra)
+  @shell.Cmd("moon", args).output(timeout_ms=120000)
+}
+
+///|
+async fn damage(path : String, offsets : Array[Int64]) -> Unit {
+  let file = @fs.open(path, mode=ReadWrite)
+  defer file.close()
+  for offset in offsets {
+    file.write_at(b"\x00", position=offset)
+  }
+  file.sync()
+}
+
+///|
+async fn main {
+  @shell.Cmd("moon", ["build", "--target", "native", "--deny-warn"]).run(
+    timeout_ms=120000,
+  )
+  let data = @fs.read_file("fixtures/earthquakes-2024-01-01.csv").binary()
+  let dir = @fs.tmpdir(prefix="moonfetchledger-reference-recovery-")
+  defer @fs.rmdir(dir, recursive=true)
+  let source = dir + "/publisher.csv"
+  let path = dir + "/installed.csv"
+  let reference = dir + "/release.blocks.mfl"
+  @fs.write_file(source, data)
+  invoke(source, ["--write-block-reference", reference, "--chunk-size", "4096"]).check()
+  let metadata = @fs.read_file(reference).binary()
+  let reference_input = [
+    "--block-reference",
+    reference,
+    "--block-reference-sha256",
+    hash(metadata),
+  ]
+  let adopt = ["--adopt-with-reference"]
+  adopt.append(reference_input)
+  @fs.write_file(path, data)
+  damage(path, [8195L])
+  let damaged = @fs.read_file(path).binary()
+  // Malformed, conflicting and missing mode input must fail before lock creation.
+  for
+    extra in [
+      ["--adopt-with-reference"],
+      ["--adopt-with-reference", "--block-reference", reference],
+      [
+        "--adopt-with-reference",
+        "--block-reference",
+        reference,
+        "--block-reference-sha256",
+        hash(b"wrong"),
+      ],
+    ] {
+    assert_true(invoke(path, extra).exit_code() != 0)
+    assert_true(!@fs.exists(path + ".mfl.lock"))
+  }
+  for
+    option in [
+      ["--audit"],
+      ["--adopt"],
+      ["--recover-checkpoint"],
+      ["--adopt-with-reference"],
+      ["--progress"],
+      ["--parallel", "1"],
+      ["--chunk-size", "4096"],
+      ["--repair-from", source],
+      ["--export-to", dir + "/unused.csv"],
+      ["--write-block-reference", dir + "/unused.mfl"],
+    ] {
+    let args = adopt.copy()
+    args.append(option)
+    assert_true(invoke(path, args).exit_code() != 0)
+    assert_eq(@fs.read_file(path).binary(), damaged)
+    assert_true(!@fs.exists(path + ".mfl") && !@fs.exists(path + ".mfl.lock"))
+    assert_true(
+      !@fs.exists(dir + "/unused.csv") && !@fs.exists(dir + "/unused.mfl"),
+    )
+  }
+  // Each kind of pre-existing metadata is retained byte-for-byte.
+  for suffix in [".mfl", ".mfl.next", ".mfl.recovering"] {
+    @fs.write_file(path + suffix, b"unrelated")
+    assert_true(invoke(path, adopt).exit_code() != 0)
+    assert_eq(@fs.read_file(path + suffix).binary(), b"unrelated")
+    assert_eq(@fs.read_file(path).binary(), damaged)
+    assert_true(!@fs.exists(path + ".mfl.lock"))
+    @fs.remove(path + suffix)
+  }
+  let adopted = invoke(path, adopt)
+  adopted.check()
+  assert_eq(
+    @json.parse(adopted.stdout().trim()).stringify(),
+    "[\"MFLAUDIT1\",false,true,\"28008\",\"23912\",[[\"8192\",\"12288\"]],[[\"8192\",\"12288\"]]]",
+  )
+  assert_eq(@fs.read_file(path).binary(), damaged)
+  let checkpoint = @fs.read_file(path + ".mfl").binary()
+  assert_true(invoke(path, adopt).exit_code() != 0)
+  assert_eq(@fs.read_file(path + ".mfl").binary(), checkpoint)
+  let repair = invoke(path, ["--repair-from", source])
+  repair.check()
+  assert_true(
+    repair
+    .stdout()
+    .contains("repaired: confirmed=28008 copied=1 retained=23912"),
+  )
+  assert_eq(@fs.read_file(path).binary(), data)
+  let complete_checkpoint = @fs.read_file(path + ".mfl").binary()
+  assert_eq(complete_checkpoint, metadata)
+  // Simulate lost local progress, retaining the cooperating lock and artifact.
+  @fs.remove(path + ".mfl")
+  damage(path, [3L, 16387L])
+  let damaged_twice = @fs.read_file(path).binary()
+  let rebuilt = invoke(path, adopt)
+  rebuilt.check()
+  assert_true(rebuilt.stdout().contains("\"19816\""))
+  assert_eq(@fs.read_file(path).binary(), damaged_twice)
+  let paused = invoke(path, [
+    "--repair-from", source, "--stop-after-blocks", "1", "--progress",
+  ])
+  paused.check()
+  assert_true(
+    paused
+    .stdout()
+    .contains("repair-paused: confirmed=23912 copied=1 retained=19816"),
+  )
+  let events = []
+  for raw in paused.stdout().split("\n") {
+    let line = raw.strip_suffix("\r").unwrap_or(raw)
+    if line.has_prefix("[") {
+      events.push(@json.parse(line).stringify())
+    }
+  }
+  assert_eq(events.length(), 3)
+  assert_true(events[0].contains("\"recovered\""))
+  assert_true(events[1].contains("\"block\""))
+  assert_true(events[2].contains("\"paused\""))
+  let resumed = invoke(path, ["--repair-from", source])
+  resumed.check()
+  assert_true(
+    resumed
+    .stdout()
+    .contains("repaired: confirmed=28008 copied=1 retained=23912"),
+  )
+  assert_eq(@fs.read_file(path).binary(), data)
+  assert_eq(@fs.read_file(path + ".mfl").binary(), complete_checkpoint)
+  invoke(path, ["--export-to", dir + "/ready.csv"]).check()
+  assert_eq(@fs.read_file(dir + "/ready.csv").binary(), data)
+  // Extra bytes cannot silently disappear during adoption; retry after correction.
+  let extra_path = dir + "/extra.csv"
+  @fs.write_file(extra_path, data + b"x")
+  assert_true(invoke(extra_path, adopt).exit_code() != 0)
+  assert_eq(@fs.read_file(extra_path).binary(), data + b"x")
+  assert_true(!@fs.exists(extra_path + ".mfl"))
+  @fs.write_file(extra_path, data)
+  invoke(extra_path, adopt).check()
+  assert_eq(@fs.read_file(extra_path + ".mfl").binary(), metadata)
+  assert_eq(@fs.read_file(reference).binary(), metadata)
+  assert_eq(@fs.read_file(source).binary(), data)
+  println(
+    "reference recovery CLI verified: new-checkpoint-only adoption retaining 23912 bytes, one-block repair/export, lost-checkpoint two-gap rebuild, saved pause/new-process resume, deterministic full checkpoint, metadata refusal and extra-data error recovery",
+  )
+}

@@ -34,6 +34,7 @@ async fn run() -> Unit {
   let mut auditing = false
   let mut recovering_checkpoint = false
   let mut adopting = false
+  let mut adopting_reference = false
   let mut progress = false
   let mut loopback_auth = false
   for i = 1; i < args.length(); {
@@ -70,7 +71,7 @@ async fn run() -> Unit {
         "Add --bearer-env NAME to read a transient Bearer token from an environment variable; HTTPS required. --allow-loopback-auth permits only 127.0.0.1 HTTP for local testing.",
       )
       println(
-        "Use --write-block-reference NEW_PATH with --output SOURCE and optional --chunk-size to publish full block records after whole-source verification. Use --audit --block-reference FILE --block-reference-sha256 TRUSTED_HEX to inspect an artifact without a local checkpoint. These are exclusive offline workflows.",
+        "Use --write-block-reference NEW_PATH with --output SOURCE and optional --chunk-size to publish full block records after whole-source verification. Use --audit or --adopt-with-reference with --block-reference FILE --block-reference-sha256 TRUSTED_HEX to inspect an artifact or create a NEW recovery checkpoint without changing artifact bytes. These are exclusive offline workflows.",
       )
       return
     }
@@ -93,6 +94,13 @@ async fn run() -> Unit {
         fail("duplicate option: --adopt")
       }
       adopting = true
+      continue i + 1
+    }
+    if flag == "--adopt-with-reference" {
+      if adopting_reference {
+        fail("duplicate option: --adopt-with-reference")
+      }
+      adopting_reference = true
       continue i + 1
     }
     if flag == "--progress" {
@@ -124,7 +132,7 @@ async fn run() -> Unit {
     continue i + 2
   }
   let spec = specification(values)
-  if reference_options(values) {
+  if reference_options(values) || adopting_reference {
     if adopting ||
       recovering_checkpoint ||
       progress ||
@@ -134,7 +142,7 @@ async fn run() -> Unit {
         "block reference workflows are exclusive offline modes; progress, credentials and other modes are unsupported",
       )
     }
-    reference_command(spec, values, auditing~)
+    reference_command(spec, values, auditing~, adopting_reference~)
     return
   }
   if values.get("--write-manifest") is Some(destination) {
