@@ -1,0 +1,190 @@
+///|
+import {
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/crypto",
+}
+
+///|
+fn hash(bytes : Bytes) -> String {
+  @crypto.bytes_to_hex_string(@crypto.sha256(bytes))
+}
+
+///|
+async fn call(
+  identity : Array[String],
+  output : String?,
+  extra : Array[String],
+) -> @shell.Output {
+  let args = ["run", "--target", "native", "cmd/fetch", "--"]
+  args.append(identity)
+  if output is Some(path) {
+    args.append(["--output", path])
+  }
+  args.append(extra)
+  @shell.Cmd("moon", args).output(timeout_ms=120000)
+}
+
+///|
+async fn no_sidecars(path : String) -> Unit {
+  for suffix in [".mfl", ".mfl.lock", ".mfl.next", ".mfl.recovering"] {
+    assert_true(!@fs.exists(path + suffix))
+  }
+}
+
+///|
+async fn main {
+  // Keep compiler output separate from the CLI's machine-readable stdout.
+  @shell.Cmd("moon", ["build", "--target", "native", "--deny-warn"]).run(
+    timeout_ms=120000,
+  )
+  let data = @fs.read_file("fixtures/earthquakes-2024-01-01.csv").binary()
+  let identity = [
+    "--url", "http://127.0.0.1:1/reference", "--length", "28008", "--etag", "\"fixture-v1\"",
+    "--sha256", "dca55780e807e6b6dc5dafe53a621bf99929681551ab85bb4a27f5142e208042",
+  ]
+  let dir = @fs.tmpdir(prefix="moonfetchledger-reference-cli-")
+  defer @fs.rmdir(dir, recursive=true)
+  let source = dir + "/publisher.csv"
+  let target = dir + "/damaged.csv"
+  let reference = dir + "/release.blocks.mfl"
+  let manifest = dir + "/release.json"
+  @fs.write_file(source, data)
+  let published = call(identity, Some(source), [
+    "--write-block-reference", reference, "--chunk-size", "4096",
+  ])
+  published.check()
+  let bytes = @fs.read_file(reference).binary()
+  let pin = hash(bytes)
+  assert_eq(
+    published.stdout().trim().to_owned(),
+    "block-reference: sha256=" + pin,
+  )
+  assert_eq(@fs.read_file(source).binary(), data)
+  no_sidecars(source)
+  let descriptor = call(identity, None, ["--write-manifest", manifest])
+  descriptor.check()
+  let descriptor_bytes = @fs.read_file(manifest).binary()
+  let pinned_identity = [
+    "--manifest",
+    manifest,
+    "--manifest-sha256",
+    hash(descriptor_bytes),
+  ]
+  @fs.write_file(target, data)
+  let file = @fs.open(target, mode=ReadWrite)
+  file.write_at(b"\x00", position=8195L)
+  file.sync()
+  file.close()
+  let damaged = @fs.read_file(target).binary()
+  let input = ["--block-reference", reference, "--block-reference-sha256", pin]
+  let args = ["--audit"]
+  args.append(input)
+  for identity in [identity, pinned_identity] {
+    let report = call(identity, Some(target), args)
+    report.check()
+    assert_eq(
+      @json.parse(report.stdout().trim()).stringify(),
+      "[\"MFLAUDIT1\",false,true,\"28008\",\"23912\",[[\"8192\",\"12288\"]],[[\"8192\",\"12288\"]]]",
+    )
+    assert_eq(@fs.read_file(target).binary(), damaged)
+    no_sidecars(target)
+  }
+  for
+    extra in [
+      ["--audit", "--block-reference", reference],
+      ["--audit", "--block-reference-sha256", pin],
+      input,
+      [
+        "--audit",
+        "--block-reference",
+        reference,
+        "--block-reference-sha256",
+        hash(b"wrong"),
+      ],
+      [
+        "--audit", "--block-reference", reference, "--block-reference-sha256", "ABC",
+      ],
+    ] {
+    assert_true(call(pinned_identity, Some(target), extra).exit_code() != 0)
+    assert_eq(@fs.read_file(target).binary(), damaged)
+    no_sidecars(target)
+  }
+  for
+    option in [
+      ["--chunk-size", "4096"],
+      ["--parallel", "1"],
+      ["--repair-from", source],
+      ["--export-to", dir + "/ready.csv"],
+      ["--progress"],
+      ["--adopt"],
+      ["--recover-checkpoint"],
+      ["--bearer-env", "MFL_UNUSED"],
+      ["--write-manifest", dir + "/unused.json"],
+    ] {
+    let extra = args.copy()
+    extra.append(option)
+    assert_true(call(pinned_identity, Some(target), extra).exit_code() != 0)
+    assert_eq(@fs.read_file(target).binary(), damaged)
+    no_sidecars(target)
+    assert_true(
+      !@fs.exists(dir + "/ready.csv") && !@fs.exists(dir + "/unused.json"),
+    )
+  }
+  // All publication conflicts preserve previous metadata and unrelated temporaries.
+  assert_true(
+    call(identity, Some(source), ["--write-block-reference", reference]).exit_code() !=
+    0,
+  )
+  @fs.write_file(dir + "/blocked.next", b"unrelated")
+  assert_true(
+    call(identity, Some(source), ["--write-block-reference", dir + "/blocked"]).exit_code() !=
+    0,
+  )
+  assert_eq(@fs.read_file(dir + "/blocked.next").binary(), b"unrelated")
+  assert_true(
+    call(pinned_identity, Some(source), ["--write-block-reference", manifest]).exit_code() !=
+    0,
+  )
+  assert_eq(@fs.read_file(manifest).binary(), descriptor_bytes)
+  assert_true(call(pinned_identity, Some(reference), args).exit_code() != 0)
+  assert_eq(@fs.read_file(reference).binary(), bytes)
+  let alias_path = dir + "/alias"
+  @fs.write_file(alias_path + ".mfl", bytes)
+  assert_true(
+    call(identity, Some(alias_path), [
+      "--audit",
+      "--block-reference",
+      alias_path + ".mfl",
+      "--block-reference-sha256",
+      pin,
+    ]).exit_code() !=
+    0,
+  )
+  assert_eq(@fs.read_file(alias_path + ".mfl").binary(), bytes)
+  assert_true(!@fs.exists(alias_path + ".mfl.lock"))
+  @fs.write_file(source, damaged)
+  assert_true(
+    call(identity, Some(source), ["--write-block-reference", dir + "/untrusted"]).exit_code() !=
+    0,
+  )
+  assert_true(
+    !@fs.exists(dir + "/untrusted") && !@fs.exists(dir + "/untrusted.next"),
+  )
+  @fs.write_file(source, data)
+  let repeated = call(identity, Some(source), [
+    "--write-block-reference",
+    dir + "/repeated",
+    "--chunk-size",
+    "4096",
+  ])
+  repeated.check()
+  assert_eq(@fs.read_file(dir + "/repeated").binary(), bytes)
+  assert_eq(@fs.read_file(reference).binary(), bytes)
+  assert_eq(@fs.read_file(manifest).binary(), descriptor_bytes)
+  println(
+    "reference CLI verified: deterministic publication, independent pins, checkpoint-free read-only audit retaining 23912 bytes, strict mode/alias/metadata preservation, bad-source refusal and recovery",
+  )
+}

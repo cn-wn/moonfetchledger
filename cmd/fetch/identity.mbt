@@ -25,7 +25,7 @@ async fn specification(values : Map[String, String]) -> @ledger.ObjectSpec {
       manifest,
       argument(values, "--manifest-sha256"),
     )
-    protect_manifest(manifest, values)
+    protect_descriptor(manifest, values, "manifest")
     spec
   } else {
     @ledger.ObjectSpec::new(
@@ -40,9 +40,10 @@ async fn specification(values : Map[String, String]) -> @ledger.ObjectSpec {
 ///|
 // Protect the loaded descriptor from accidentally becoming an artifact, saved
 // checkpoint, lock or export temporary. Resolve existing filesystem aliases.
-async fn protect_manifest(
+async fn protect_descriptor(
   manifest : String,
   values : Map[String, String],
+  role : String,
 ) -> Unit {
   let source = @fs.realpath(manifest).to_lower()
   let writes : Array[String] = []
@@ -58,10 +59,13 @@ async fn protect_manifest(
   if values.get("--export-to") is Some(destination) {
     writes.append([destination, destination + ".next"])
   }
+  if values.get("--write-block-reference") is Some(destination) {
+    writes.append([destination, destination + ".next"])
+  }
   for path in writes {
     if @fs.exists(path) && @fs.realpath(path).to_lower() == source {
       fail(
-        "artifact/session/export paths must not alias the input manifest; retain the release metadata",
+        "artifact/session/export paths must not alias the input \{role}; retain the release metadata",
       )
     }
   }

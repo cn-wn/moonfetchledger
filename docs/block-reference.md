@@ -1,6 +1,8 @@
 # Audit files without a local checkpoint
 
 A release publisher can distribute complete block records alongside an artifact.
+The [native command-line workflow](reference-cli.md) publishes and audits these
+references without requiring an application integration.
 Consumers who lost local progress metadata can locate damaged blocks without
 network requests, content writes or creating sidecars. The reference is immutable
 release metadata with an independently trusted exact-byte SHA-256 pin.

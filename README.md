@@ -37,6 +37,9 @@ downloads, authentication and progress are shared capabilities, not novelty clai
 - [Pinned complete block references](docs/block-reference.md): publish records
   after whole-source verification and audit unmanaged damaged files without local
   checkpoints, networking or sidecar creation.
+- [Native reference CLI](docs/reference-cli.md): verified source publication and
+  independently pinned, checkpoint-free read-only audits with strict mode and
+  descriptor-path protection.
 - Reference-based adoption of damaged/truncated existing files: create a new
   checkpoint from actual matching blocks, preserve content and existing metadata,
   then repair through the existing client or local-backup workflow.

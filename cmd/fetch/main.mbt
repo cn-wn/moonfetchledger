@@ -69,6 +69,9 @@ async fn run() -> Unit {
       println(
         "Add --bearer-env NAME to read a transient Bearer token from an environment variable; HTTPS required. --allow-loopback-auth permits only 127.0.0.1 HTTP for local testing.",
       )
+      println(
+        "Use --write-block-reference NEW_PATH with --output SOURCE and optional --chunk-size to publish full block records after whole-source verification. Use --audit --block-reference FILE --block-reference-sha256 TRUSTED_HEX to inspect an artifact without a local checkpoint. These are exclusive offline workflows.",
+      )
       return
     }
     if flag == "--audit" {
@@ -110,7 +113,7 @@ async fn run() -> Unit {
         "--url", "--output", "--length", "--etag", "--sha256", "--chunk-size", "--parallel",
         "--stop-after-blocks", "--max-attempts", "--retry-delay-ms", "--request-timeout-ms",
         "--export-to", "--repair-from", "--bearer-env", "--manifest", "--manifest-sha256",
-        "--write-manifest",
+        "--write-manifest", "--write-block-reference", "--block-reference", "--block-reference-sha256",
       ].contains(flag) {
       fail("unknown option: \{flag}; use --help")
     }
@@ -121,6 +124,19 @@ async fn run() -> Unit {
     continue i + 2
   }
   let spec = specification(values)
+  if reference_options(values) {
+    if adopting ||
+      recovering_checkpoint ||
+      progress ||
+      loopback_auth ||
+      values.contains("--write-manifest") {
+      fail(
+        "block reference workflows are exclusive offline modes; progress, credentials and other modes are unsupported",
+      )
+    }
+    reference_command(spec, values, auditing~)
+    return
+  }
   if values.get("--write-manifest") is Some(destination) {
     if auditing ||
       adopting ||

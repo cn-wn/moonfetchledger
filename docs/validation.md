@@ -166,6 +166,14 @@ against explicit expected records. Run `moon run scripts/local_storage_demo.mbtx
 --check-progress-lines` to check this parser without a native C compiler, or omit
 the option to run the full actual-file workflow.
 
+The reference CLI workflow runs actual native commands using inline and pinned
+identity input. It checks deterministic reference publication, offline unmanaged
+damage audit, paired reference arguments, wrong/invalid pins, all mode/policy
+conflicts, descriptor aliases and owned destination/temporary preservation. A
+bad publisher source cannot publish metadata; a later valid publication recovers
+and yields identical bytes. The actual artifact and reference/identity descriptors
+are compared after refusal and audit, with no unmanaged sidecar creation.
+
 Pinned block references add 195 binary size/layout round trips, canonical MFL1
 equivalence, all eight three-block partial-reference masks and local corruption
 masks, independent recovery sessions, wrong/incomplete whole-source refusal,
