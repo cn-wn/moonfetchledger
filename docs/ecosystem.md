@@ -49,6 +49,18 @@ MoonFetchLedger 的独立贡献限定为：**为已有下载客户端补充可�
 
 ## 来源快照、许可证与不确定性
 
+2026-10-21 cross-version review: zsync's public control-file workflow is a design
+reference for the new moved-block seed scanner, not a MoonBit dependency or copied
+implementation. `mizchi/bit_pack@0.48.0` already offers Git packfile delta
+encoding/decoding (https://mooncakes.io/docs/mizchi/bit_pack%400.48.0); that Git
+object/pack API is not reproduced here. This module publishes a target index and
+reconstructs a regular-file MFL1 session for existing download clients, without
+implementing Git objects, packfiles or Hub caches. Searches included MoonBit,
+zsync, rsync, delta, file update, rolling checksum and seed. No search is an
+ecosystem-wide absence proof; new/unindexed implementations remain uncertain.
+See [the implemented boundary](delta-update.md). Metadata signatures and remote
+trust distribution remain future work, not current differentiated capabilities.
+
 2026-10-19 重新查询两个仓库的公开 HEAD，均仍为下列快照；实际依赖版本的
 续传源码与公开接口也已复核。此处不把同长度的完成判断推广为上游全部 API
 均缺少完整性能力，比较范围限定为明确列出的调用路径和当前组合实现。

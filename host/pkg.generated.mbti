@@ -21,6 +21,8 @@ pub async fn export_verified(@moonfetchledger.ObjectSpec, String, String) -> Uni
 
 pub async fn load_block_reference(@moonfetchledger.ObjectSpec, String, String) -> @moonfetchledger.BlockReference
 
+pub async fn load_delta_reference(String, String) -> @moonfetchledger.DeltaReference
+
 pub async fn load_manifest(String, String) -> @moonfetchledger.ObjectSpec
 
 pub async fn receive_from(@moonfetchledger.ObjectSpec, String, fetch_range~ : async (@moonfetchledger.ByteRange) -> ReceivedBlock, chunk_size? : Int32, parallel? : Int32, stop_after_blocks? : Int32, on_progress? : async (DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> DownloadReport
@@ -29,7 +31,11 @@ pub async fn recover_checkpoint(@moonfetchledger.ObjectSpec, String) -> AuditRep
 
 pub async fn repair_from_local(@moonfetchledger.ObjectSpec, String, String, stop_after_blocks? : Int32, on_progress? : async (LocalRepairProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> LocalRepairReport
 
+pub async fn reuse_from_seed(@moonfetchledger.DeltaReference, String, String) -> SeedReuseReport
+
 pub async fn write_block_reference(@moonfetchledger.ObjectSpec, String, String, chunk_size? : Int32) -> String
+
+pub async fn write_delta_reference(@moonfetchledger.ObjectSpec, String, String, chunk_size? : Int32) -> String
 
 pub async fn write_manifest(@moonfetchledger.ObjectSpec, String) -> String
 
@@ -118,6 +124,15 @@ pub(all) struct ReceivedBlock {
   total : Int64
   content_encoding : String
 }
+
+pub struct SeedReuseReport {
+  complete : Bool
+  scanned_bytes : Int64
+  reused_bytes : Int64
+  reused_blocks : Int32
+  missing_ranges : Array[@moonfetchledger.ByteRange]
+} derive(@debug.Debug)
+pub fn SeedReuseReport::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

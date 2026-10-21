@@ -1,17 +1,18 @@
-# Validation record — 2026-10-19
+# Validation record — 2026-10-21
 
-The updated local Linux validation uses the same current stable version observed
-in CI (the initial local run used 2026-10-12):
+The cross-version seed milestone uses the current official stable CLI/runner,
+downloaded into an isolated Linux toolchain. The compiler is unchanged from the
+2026-10-19 run (the initial local run used 2026-10-12):
 
 ```text
-moon 0.1.20261016 (1af328f 2026-10-16)
+moon 0.1.20261020 (2284bd2 2026-10-20)
 moonc v0.10.16+b1a0e846e (2026-10-16)
-moonrun 0.1.20261016
+moonrun 0.1.20261020
 ```
 
 Linux moon SHA-256 matches the freshly fetched official latest checksum list:
 https://cli.moonbitlang.com/binaries/latest/moonbit-linux-x86_64.sha256 :
-`04e3761068089c8f0d0c549aa6a46a81f21ec6360c34ec5803a97ad8ca711797`.
+`12f0aea51fe72f0a44f973663b3c657d721326724c715124832541fca3217978`.
 Three generated interfaces were regenerated with this compiler: it now prints
 Int32 where the previous compiler printed Int for the same source declarations.
 No handwritten interface normalization or relaxed drift check is used.
@@ -31,14 +32,14 @@ alone proves no native execution. Windows-2022 is not currently verified.
 
 - Ubuntu/WSL, GCC 12.5: actual four-target tests, native assembly and integration
   examples. Windows local tooling is used for strict checks and API discovery.
-- 33 tests per portable target, including the checked README. Generated property cases cover
+- 40 tests per portable target, including the checked README. Generated property cases cover
   129 binary sizes x 4 block sizes (516 complete reception/recovery round trips).
 - Native host adds response-range validation, preservation of unrelated/extra
   data, exclusive-lock/reopen, checkpoint preservation and retry-budget/wait-hint
   boundary tests, read-only auditing, shared/exclusive lock interaction and
   whole-file integrity, adoption, export, repair, progress, pause, authentication,
   pinned manifests, interrupted checkpoint recovery and source/WebDAV integration
-  (93 total on native, including the checked WebDAV usage example).
+  (104 total on native, including the checked WebDAV usage example).
 - Coverage projection: all 128 confirmation masks for seven blocks, including
   reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
   return arrays, checkpoint preservation, restoration gate and maximum length.

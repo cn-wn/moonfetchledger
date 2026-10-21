@@ -58,6 +58,37 @@ pub fn Session::reserve_missing(self : Session) -> Lease? raise LedgerError {
 }
 
 ///|
+/// Reserve one exact aligned block, for a verified seed plan. Return None if it
+/// is already confirmed or reserved. Invalid ranges leave coverage unchanged.
+pub fn Session::reserve_range(
+  self : Session,
+  range : ByteRange,
+) -> Lease? raise LedgerError {
+  if self.recovering {
+    raise RecoveryRequired
+  }
+  if range.start < 0L ||
+    range.start >= self.spec.length ||
+    range.start % self.chunk_size.to_int64() != 0L {
+    raise InvalidSpec("reservation requires one exact aligned target block")
+  }
+  let index = (range.start / self.chunk_size.to_int64()).to_int()
+  if range != self.block_range(index) {
+    raise InvalidSpec("reservation requires one complete target block")
+  }
+  if !(self.blocks[index] is Missing) {
+    return None
+  }
+  if self.next_id == 9223372036854775807L {
+    raise InvalidSpec("lease counter exhausted; checkpoint and restore")
+  }
+  let id = self.next_id
+  self.next_id += 1L
+  self.blocks[index] = Reserved(id)
+  Some({ range, owner: self, index, id, })
+}
+
+///|
 fn Session::check_lease(
   self : Session,
   lease : Lease,

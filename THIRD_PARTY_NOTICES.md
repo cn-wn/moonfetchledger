@@ -2,6 +2,14 @@
 
 No implementation was copied from the comparison projects.
 
+Cross-version seed reuse references the public rolling/strong matching workflow
+in https://github.com/cph6/zsync/blob/master/SPEC.md (zsync project: Artistic-2.0).
+No zsync code, prose or tests were copied; MFLDELTA1 is a separate format, not a
+zsync port or compatibility layer. Its indexer, scanner, storage integration and
+test cases are project-authored Apache-2.0. examples/delta derives an explicitly
+synthetic v2 by insertion/removal/reordering of the existing public-domain USGS
+fixture; it is not presented as another actual USGS release.
+
 - `moonbitlang/x@0.5.5`: SHA-256 and platform path utilities, Apache-2.0;
   https://github.com/moonbitlang/x . Dependency source is not vendored.
 - `moonbitlang/async@0.22.4`: host I/O, Apache-2.0;

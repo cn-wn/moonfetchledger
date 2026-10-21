@@ -47,6 +47,10 @@ downloads, authentication and progress are shared capabilities, not novelty clai
 - [Real-server integration](integration/README.md): a separate reproducible
   WsgiDAV/Cheroot test using the published WebDAV client for PROPFIND, conditional
   ranges, checkpoint-free damage recovery and changed-version refusal.
+- [Cross-version seed reuse](docs/delta-update.md): publish an authenticated target
+  index, find moved blocks in an untrusted old file with rolling/SHA-256 matching,
+  and stage a new sparse MFL1 session for existing receivers. The old file is
+  preserved; a derived real-data v2 example demonstrates offline reconstruction.
 - Verified local-file adoption: bounded storage indexing, whole-digest gating,
   new recovery checkpoint and later selective repair without changing original bytes.
 - Verified export to a new ready-to-use path: source reconciliation, copied-byte
