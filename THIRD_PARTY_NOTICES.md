@@ -10,6 +10,13 @@ test cases are project-authored Apache-2.0. examples/delta derives an explicitly
 synthetic v2 by insertion/removal/reordering of the existing public-domain USGS
 fixture; it is not presented as another actual USGS release.
 
+The bounded HTTP metadata loader, update orchestrator, cmd/update CLI and its
+actual-process workflow tests are project-authored Apache-2.0 and reuse the pinned
+async HTTP/filesystem APIs. The optional real WsgiDAV scenario publishes a
+synthetic v2 and metadata through upstream PUT, reuses the same USGS-derived
+bytes and uses upstream conditional range requests to fill only missing blocks.
+No additional upstream code/test suite or cryptographic signature code was copied.
+
 - `moonbitlang/x@0.5.5`: SHA-256 and platform path utilities, Apache-2.0;
   https://github.com/moonbitlang/x . Dependency source is not vendored.
 - `moonbitlang/async@0.22.4`: host I/O, Apache-2.0;

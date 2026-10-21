@@ -1,8 +1,10 @@
 # MoonFetchLedger
 
-`cn-wn/moonfetchledger` is a MoonBit block-integrity audit and repair layer for
-existing download clients. It reconciles actual fixed-block coverage, detects
-same-size content damage and preserves valid blocks during selective repair.
+`cn-wn/moonfetchledger` is a MoonBit cross-version file update and integrity
+recovery layer for existing download clients. Its [delta workflow](docs/delta-update.md)
+finds verified target blocks at arbitrary offsets in old files, stages sparse
+coverage, fetches gaps and delivers verified new content while preserving v1.
+It also detects same-size damage and retains valid blocks during selective repair.
 Independently pinned block references also recover valid coverage when a file is
 already damaged and its local checkpoint is missing. See the
 [reproducible difference proof](docs/differentiation-proof.md).
@@ -51,6 +53,10 @@ downloads, authentication and progress are shared capabilities, not novelty clai
   index, find moved blocks in an untrusted old file with rolling/SHA-256 matching,
   and stage a new sparse MFL1 session for existing receivers. The old file is
   preserved; a derived real-data v2 example demonstrates offline reconstruction.
+- [Complete delta update workflow](docs/delta-update.md): bounded hash-pinned HTTP
+  metadata, moved-block staging, gap downloads, explicit resume and verified
+  delivery through `host.update_from_seed` and `cmd/update`. Run
+  `moon run scripts/delta_update_demo.mbtx`; signed metadata trust is still planned.
 - Verified local-file adoption: bounded storage indexing, whole-digest gating,
   new recovery checkpoint and later selective repair without changing original bytes.
 - Verified export to a new ready-to-use path: source reconciliation, copied-byte

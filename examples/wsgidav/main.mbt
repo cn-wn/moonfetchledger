@@ -139,4 +139,80 @@ async fn main {
   println(
     "WsgiDAV interoperability verified: real PROPFIND/HTTP ETag/full download, pinned recovery retaining 23912 bytes, one 4096-byte range repair/export, changed-version If-Match refusal preserving artifact bytes",
   )
+  // The target version can now reuse moved bytes from an untrusted v1.
+  let v2 = b"MoonFetchLedger v2\n" +
+    data[8192:16384].to_owned() +
+    b"new-section\n" +
+    data[:4096].to_owned() +
+    data[16384:].to_owned()
+  let remote_v2 = "/earthquakes-v2.bin"
+  let _ = client.put_file(path=remote_v2, data=v2)
+  let probe_v2 = client.get_file(
+    path=remote_v2,
+    range=@upstream.ByteRange::from(start=0, end=0),
+  )
+  assert_eq(probe_v2.status, 206)
+  assert_eq(probe_v2.content_range.unwrap().total, Some(v2.length()))
+  let spec_v2 = @ledger.ObjectSpec::new(
+    endpoint + remote_v2,
+    v2.length().to_int64(),
+    probe_v2.etag.unwrap(),
+    @ledger.digest(v2),
+  )
+  let publisher_v2 = dir + "/publisher-v2"
+  let seed_v1 = dir + "/seed-v1"
+  let staged_v2 = dir + "/staged-v2"
+  @fs.write_file(publisher_v2, v2)
+  @fs.write_file(seed_v1, data)
+  let old_v1 = @fs.open(seed_v1, mode=ReadWrite)
+  old_v1.write_at(b"\x00", position=12000L)
+  old_v1.close()
+  let old_bytes = @fs.read_file(seed_v1).binary()
+  let delta_path = dir + "/v2.delta"
+  let delta_pin = @host.write_delta_reference(
+    spec_v2,
+    publisher_v2,
+    delta_path,
+    chunk_size=4096,
+  )
+  let delta_bytes = @fs.read_file(delta_path).binary()
+  let _ = client.put_file(path="/v2.delta", data=delta_bytes)
+  let delta = @host.fetch_delta_reference(endpoint + "/v2.delta", delta_pin)
+  let seeded = @host.reuse_from_seed(delta, seed_v1, staged_v2)
+  assert_eq(seeded.reused_bytes, 11655L)
+  let ranges_v2 : Array[@ledger.ByteRange] = []
+  let collect = async fn(event : @host.DownloadProgress) -> Unit {
+    if event.phase is BlockCommitted(range) {
+      ignore(@ledger.restore(@fs.read_file(staged_v2 + ".mfl").text(), spec_v2))
+      ranges_v2.push(range)
+    }
+  }
+  let source_v2 = @dav.Source::new(spec_v2, config, remote_v2)
+  let paused_v2 = source_v2.receive(
+    staged_v2,
+    parallel=1,
+    stop_after_blocks=1,
+    on_progress=collect,
+  )
+  assert_true(!paused_v2.complete)
+  assert_eq(paused_v2.confirmed_bytes, 15751L)
+  let resumed_v2 = @dav.Source::new(spec_v2, config, remote_v2).receive(
+    staged_v2,
+    parallel=1,
+    on_progress=collect,
+  )
+  assert_true(resumed_v2.complete)
+  assert_eq(resumed_v2.downloaded_blocks, 2)
+  assert_eq(ranges_v2, [
+    { start: 0L, end: 4096L, },
+    { start: 8192L, end: 12288L, },
+    { start: 12288L, end: 16384L, },
+  ])
+  @host.export_verified(spec_v2, staged_v2, dir + "/ready-v2")
+  assert_eq(@fs.read_file(dir + "/ready-v2").binary(), v2)
+  assert_eq(@fs.read_file(seed_v1).binary(), old_bytes)
+  assert_eq(@fs.read_file(delta_path).binary(), delta_bytes)
+  println(
+    "WsgiDAV cross-version update verified: real publisher metadata GET, moved-block reuse=11655, missing=12288 fetched through published WebDAV client across pause/reopen, preserved v1 and verified v2 delivery",
+  )
 }

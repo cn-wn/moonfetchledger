@@ -19,11 +19,19 @@ repository = "https://github.com/cn-wn/moonfetchledger"
 
 license = "Apache-2.0"
 
-keywords = [ "integrity", "audit", "repair", "recovery", "webdav" ]
+keywords = [
+  "integrity",
+  "audit",
+  "repair",
+  "recovery",
+  "webdav",
+  "delta",
+  "update",
+]
 
 preferred_target = "native"
 
-description = "Block-integrity audit, sparse storage recovery and verified repair for existing download clients."
+description = "Verified cross-version file updates, block-integrity audits and sparse recovery for existing clients."
 
 import {
   "moonbitlang/x@0.5.5",

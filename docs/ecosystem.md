@@ -58,8 +58,10 @@ reconstructs a regular-file MFL1 session for existing download clients, without
 implementing Git objects, packfiles or Hub caches. Searches included MoonBit,
 zsync, rsync, delta, file update, rolling checksum and seed. No search is an
 ecosystem-wide absence proof; new/unindexed implementations remain uncertain.
-See [the implemented boundary](delta-update.md). Metadata signatures and remote
-trust distribution remain future work, not current differentiated capabilities.
+See [the implemented boundary](delta-update.md). Metadata signatures and automated
+trust-anchor distribution remain future work. Bounded remote metadata fetching
+with an independently supplied SHA-256 pin and the complete update workflow are
+implemented; an adjacent untrusted pin is not a trust bootstrap.
 
 2026-10-19 重新查询两个仓库的公开 HEAD，均仍为下列快照；实际依赖版本的
 续传源码与公开接口也已复核。此处不把同长度的完成判断推广为上游全部 API

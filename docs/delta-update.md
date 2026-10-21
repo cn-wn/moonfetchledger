@@ -72,8 +72,63 @@ Whole-file verification remains mandatory before delivery. No power-loss claim.
 Core supports wasm/wasm-gc/JS/native; file operations require native. Receiving
 adapter URL/authentication/size limits still apply.
 
-Signatures, key rotation, anti-rollback, remote metadata fetching and a dedicated
-update CLI are not implemented in this first milestone.
+## HTTP metadata and complete update workflow
+
+`host.fetch_delta_reference(url, trusted_pin, request_timeout_ms=...)` fetches
+public metadata into bounded memory without filesystem writes. HTTP 200,
+identity encoding and no Content-Range are required; redirects are refused.
+Declared or streamed bodies exceeding 16000000 bytes fail, and SHA-256 is checked
+before parsing. Timeouts are 1..120000 ms. Errors do not echo metadata URLs.
+This distributes metadata with an independently trusted pin; a server supplying
+both bytes and an untrusted pin does not establish authenticity.
+
+`host.update_from_seed(reference, staging, seed=old, export_to=new_ready, ...)`
+performs initial reuse, existing HTTP reception and verified export. It supports
+parallelism, a download-block budget, bounded retries/timeouts and optional bound
+BearerAuth through the existing receiver. Resume with `resuming=true` and no seed;
+it requires existing staging/checkpoint/lock and revalidates stored coverage.
+The saved layout is preserved on resume, including another compatible receiver's
+layout. Paused operations do not publish ready output. Invalid controls and occupied
+delivery paths fail before staging writes. Completion requires whole-target
+verification; v1 and previous ready files are never replaced. Retain partial
+progress after errors and explicitly resume.
+
+Run the CLI help or the self-contained actual-process demonstration:
+
+```text
+moon run --target native cmd/update -- --help
+moon run scripts/delta_update_demo.mbtx
+```
+
+For your own release, substitute actual identity data and independently trusted pins:
+
+```text
+moon run --target native cmd/update -- --publish --source v2.bin --metadata v2.delta --url https://example.test/v2.bin --length 123456 --etag '"v2"' --sha256 TRUSTED_WHOLE_SHA256
+moon run --target native cmd/update -- --metadata-url https://example.test/v2.delta --metadata-sha256 INDEPENDENT_TRUSTED_PIN --seed v1.bin --output staging-v2 --export-to ready-v2
+moon run --target native cmd/update -- --metadata v2.delta --metadata-sha256 INDEPENDENT_TRUSTED_PIN --resume --output staging-v2 --export-to ready-v2
+```
+
+Choose exactly one of `--metadata`/`--metadata-url` and one of `--seed`/`--resume`.
+Consumer chunk-size and inline identity overrides are refused. Publisher output
+prints its byte pin; copying it adjacent to a download is not an independent
+trust channel. Canonical MFLUPDATE1 JSON lines describe publication, seeding,
+paused/complete reception and verified export. The CLI handles public artifacts;
+use the library's optional BearerAuth for private artifacts. Metadata and target
+URLs require ASCII DNS/IPv4 authorities, canonical ports, no userinfo, fragments,
+backslashes or `@` characters; IPv6 authorities are unsupported here.
+
+The demo starts an actual HTTP origin and separate command processes. The derived
+v2 is 23943 bytes: 11655 are reused and three 4096-byte gaps remain. One download
+is saved before pause; a damaged saved block is detected on resume and a changed
+ETag is refused without content writes. A later process finishes and exports exact
+v2 bytes. Bad pins/options preserve inputs. Complete reopen uses local metadata
+after the origin stops with no artifact requests. The optional WsgiDAV integration
+also publishes/fetches actual metadata and repairs these cross-version gaps through
+the published upstream WebDAV client.
+
+Release signatures, trust-anchor bootstrap, key rotation, anti-rollback, shared
+chunk caching and installed-file replacement remain unimplemented. This milestone
+addresses cross-version reuse and a pinned update workflow, not all review gaps.
 
 ## Sources
 

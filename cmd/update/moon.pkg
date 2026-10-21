@@ -1,0 +1,13 @@
+import {
+  "moonbitlang/async",
+  "cn-wn/moonfetchledger" @ledger,
+  "cn-wn/moonfetchledger/host",
+  "moonbitlang/core/env",
+  "moonbitlang/core/string" @strconv,
+}
+
+pkgtype(kind: "executable")
+
+options(
+  supported_targets: "native",
+)

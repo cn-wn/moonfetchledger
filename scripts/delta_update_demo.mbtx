@@ -1,0 +1,290 @@
+///|
+import {
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/http",
+  "moonbitlang/async@0.22.4/socket",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string" @strconv,
+  "moonbitlang/x@0.5.5/crypto",
+}
+
+///|
+fn hash(bytes : Bytes) -> String {
+  @crypto.bytes_to_hex_string(@crypto.sha256(bytes))
+}
+
+///|
+async fn invoke(args : Array[String]) -> @shell.Output {
+  let command = ["run", "--target", "native", "cmd/update", "--"]
+  command.append(args)
+  @shell.Cmd("moon", command).output(timeout_ms=120000)
+}
+
+///|
+fn records(text : String) -> Array[Json] raise {
+  let result = []
+  for line in text.split("\n") {
+    if !line.trim().is_empty() {
+      result.push(@json.parse(line.trim()))
+    }
+  }
+  result
+}
+
+///|
+async fn main {
+  @shell.Cmd("moon", ["build", "--target", "native", "--deny-warn"]).run(
+    timeout_ms=120000,
+  )
+  let original = @fs.read_file("fixtures/earthquakes-2024-01-01.csv").binary()
+  let v2 = b"MoonFetchLedger v2\n" +
+    original[8192:16384].to_owned() +
+    b"new-section\n" +
+    original[:4096].to_owned() +
+    original[16384:].to_owned()
+  let dir = @fs.tmpdir(prefix="moonfetchledger-delta-cli-")
+  defer @fs.rmdir(dir, recursive=true)
+  let publisher = dir + "/publisher"
+  let seed = dir + "/v1"
+  let metadata_path = dir + "/v2.delta"
+  let staging = dir + "/staging"
+  let ready = dir + "/ready"
+  @fs.write_file(publisher, v2)
+  @fs.write_file(seed, original)
+  let old = @fs.open(seed, mode=ReadWrite)
+  old.write_at(b"\x00", position=12000L)
+  old.close()
+  let old_bytes = @fs.read_file(seed).binary()
+  let requests : Array[Int32] = []
+  let successful : Array[Int32] = []
+  let mut metadata = b""
+  let mut metadata_gets = 0
+  let mut reject_version = false
+  @async.with_task_group(group => {
+    let server = @http.Server::Server(@socket.Addr::parse("127.0.0.1:0"))
+    defer server.close()
+    let base = "http://127.0.0.1:\{server.addr.port()}"
+    let serving = group.spawn(() => {
+      while true {
+        let (conn, _) = server.accept()
+        let request = conn.read_request()
+        if request.path == "/stop" {
+          conn.send_response(200, "OK", extra_headers={ "Connection": "close" })
+          conn.end_response()
+          conn.close()
+          break
+        }
+        group.spawn_bg(allow_failure=true, () => {
+          defer conn.close()
+          if request.path == "/metadata" {
+            metadata_gets += 1
+            assert_eq(request.headers.get("Accept-Encoding"), Some("identity"))
+            conn.send_response(200, "OK", extra_headers={
+              "Connection": "close",
+            })
+            conn.write(metadata)
+            conn.end_response()
+            return
+          }
+          assert_eq(request.path, "/v2")
+          assert_eq(request.headers.get("If-Range"), Some("\"v2\""))
+          assert_eq(request.headers.get("Accept-Encoding"), Some("identity"))
+          let header = request.headers.get("Range").unwrap_or("")
+          assert_true(header.has_prefix("bytes=")) // No whole-file GET is permitted.
+          let bounds = header[6:].split("-").collect()
+          let start = @strconv.parse_int(bounds[0])
+          let end = @strconv.parse_int(bounds[1]) + 1
+          assert_true(start >= 0 && end > start && end <= v2.length())
+          requests.push(start)
+          let bad = reject_version
+          reject_version = false
+          conn.send_response(206, "Partial Content", extra_headers={
+            "Connection": "close",
+            "ETag": if bad {
+              "\"changed-v3\""
+            } else {
+              "\"v2\""
+            },
+            "Content-Range": "bytes \{start}-\{end - 1}/\{v2.length()}",
+          })
+          conn.write(v2[start:end])
+          conn.end_response()
+          if !bad {
+            successful.push(start)
+          }
+        })
+      }
+    })
+    let published = invoke([
+      "--publish",
+      "--source",
+      publisher,
+      "--metadata",
+      metadata_path,
+      "--url",
+      base + "/v2",
+      "--length",
+      v2.length().to_string(),
+      "--etag",
+      "\"v2\"",
+      "--sha256",
+      hash(v2),
+      "--chunk-size",
+      "4096",
+    ])
+    published.check()
+    metadata = @fs.read_file(metadata_path).binary()
+    let pin = hash(metadata)
+    assert_eq(records(published.stdout()), [
+      Json::array([
+        Json::string("MFLUPDATE1"),
+        Json::string("published"),
+        Json::string(pin),
+      ]),
+    ])
+    let remote = [
+      "--metadata-url",
+      base + "/metadata",
+      "--metadata-sha256",
+      pin,
+      "--output",
+      staging,
+      "--parallel",
+      "1",
+      "--export-to",
+      ready,
+    ]
+    let bad_pin = invoke([
+      "--metadata-url",
+      base + "/metadata",
+      "--metadata-sha256",
+      hash(b"wrong"),
+      "--seed",
+      seed,
+      "--output",
+      staging,
+    ])
+    assert_true(bad_pin.exit_code() != 0)
+    assert_true(!@fs.exists(staging) && !@fs.exists(staging + ".mfl.lock"))
+    assert_eq(requests.length(), 0)
+    let gets_before = metadata_gets
+    for
+      bad in [
+        ["--resume", "--seed", seed],
+        ["--seed", seed, "--parallel", "0"],
+        ["--seed", seed, "--chunk-size", "4096"],
+        ["--seed", seed, "--metadata", metadata_path],
+      ] {
+      let args = remote.copy()
+      args.append(bad)
+      assert_true(invoke(args).exit_code() != 0)
+      assert_true(!@fs.exists(staging + ".mfl.lock"))
+    }
+    assert_eq(metadata_gets, gets_before)
+    let paused_args = remote.copy()
+    paused_args.append(["--seed", seed, "--stop-after-blocks", "1"])
+    let paused = invoke(paused_args)
+    paused.check()
+    let progress = records(paused.stdout())
+    assert_true(
+      progress[0]
+      is [
+        String("MFLUPDATE1"),
+        String("seeded"),
+        String("28008"),
+        String("11655"),
+        String("3"),
+      ],
+    )
+    assert_true(
+      progress[1]
+      is [
+        String("MFLUPDATE1"),
+        String("paused"),
+        String("15751"),
+        String("1"),
+        String("11655"),
+      ],
+    )
+    assert_eq(requests, [0])
+    assert_eq(successful, [0])
+    assert_true(!@fs.exists(ready))
+    assert_eq(@fs.read_file(seed).binary(), old_bytes)
+    // A new process must re-audit retained blocks. Damage the downloaded block,
+    // then reject a changed remote version before it can write any replacement.
+    let damaged = @fs.open(staging, mode=ReadWrite)
+    damaged.write_at(b"\x00", position=37L)
+    damaged.close()
+    let before_refusal = @fs.read_file(staging).binary()
+    reject_version = true
+    let resume_args = remote.copy()
+    resume_args.push("--resume")
+    let refused = invoke(resume_args)
+    assert_true(refused.exit_code() != 0)
+    assert_eq(@fs.read_file(staging).binary(), before_refusal)
+    assert_true(!@fs.exists(ready))
+    let resumed = invoke(resume_args)
+    resumed.check()
+    let finished = records(resumed.stdout())
+    assert_true(
+      finished[0]
+      is [
+        String("MFLUPDATE1"),
+        String("complete"),
+        String("23943"),
+        String("3"),
+        String("11655"),
+      ],
+    )
+    assert_true(
+      finished[1] is [String("MFLUPDATE1"), String("exported"), String(_)],
+    )
+    assert_eq(requests, [0, 0, 0, 8192, 12288])
+    assert_eq(successful, [0, 0, 8192, 12288])
+    assert_eq(@fs.read_file(staging).binary(), v2)
+    assert_eq(@fs.read_file(ready).binary(), v2)
+    assert_eq(@fs.read_file(seed).binary(), old_bytes)
+    assert_eq(@fs.read_file(metadata_path).binary(), metadata)
+    ignore(@http.get(base + "/stop"))
+    serving.wait()
+    let before_reopen = requests.copy()
+    let offline = invoke([
+      "--metadata",
+      metadata_path,
+      "--metadata-sha256",
+      pin,
+      "--resume",
+      "--output",
+      staging,
+      "--export-to",
+      dir + "/ready-again",
+    ])
+    offline.check()
+    assert_true(
+      records(offline.stdout())[0]
+      is [
+        String("MFLUPDATE1"),
+        String("complete"),
+        String("23943"),
+        String("0"),
+        String("23943"),
+      ],
+    )
+    assert_eq(@fs.read_file(dir + "/ready-again").binary(), v2)
+    assert_eq(requests, before_reopen)
+    // A conflicting delivery destination is retained even on completed reopen.
+    assert_true(
+      invoke([
+        "--metadata", metadata_path, "--metadata-sha256", pin, "--resume", "--output",
+        staging, "--export-to", ready,
+      ]).exit_code() !=
+      0,
+    )
+    assert_eq(@fs.read_file(ready).binary(), v2)
+  })
+  println(
+    "delta update CLI verified: publisher -> pinned remote metadata -> moved-block reuse 11655/23943 -> saved pause -> changed-version refusal -> new-process resume -> verified new destination; bad-pin/mode preservation and stopped-origin zero-fetch reopen",
+  )
+}

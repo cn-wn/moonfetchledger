@@ -39,7 +39,7 @@ alone proves no native execution. Windows-2022 is not currently verified.
   boundary tests, read-only auditing, shared/exclusive lock interaction and
   whole-file integrity, adoption, export, repair, progress, pause, authentication,
   pinned manifests, interrupted checkpoint recovery and source/WebDAV integration
-  (104 total on native, including the checked WebDAV usage example).
+  (107 total on native, including the checked WebDAV usage example).
 - Coverage projection: all 128 confirmation masks for seven blocks, including
   reserved gaps, short final blocks, per-byte partition, exact coalescing, fresh
   return arrays, checkpoint preservation, restoration gate and maximum length.
@@ -244,6 +244,21 @@ MoonBit code is checked with `--deny-warn`. No dependency code was modified.
 The current standalone-script dependency graph also reports a duplicate import
 warning for async/internal/c_buffer. This tool/dependency warning is recorded
 separately from the project's strict source checks and is not suppressed by patches.
+
+Cross-version tests compare streaming scans against exhaustive matching for 66
+binary sizes, four block sizes and three input segment sizes; exercise large
+wrapping sums, moved/repeated/short blocks, deliberate weak collisions, publisher
+failure/retry, strict metadata schemas, targeted leases, old/foreign file
+preservation, seed locks and exact 16000000-byte acceptance. Native update tests
+also check controls before writes, explicit resume, verified-only delivery,
+metadata URL/pin policy and actual HTTP redirect/encoding/range/size/change
+refusals with successful retry. The CLI's separate processes publish and fetch
+pinned metadata, reuse 11655 of 23943 v2 bytes, save a one-block pause, re-audit
+later damage, refuse changed ETag before content writes, resume and export exact
+v2; stopped-origin complete reopen requires no artifact request. The optional
+actual WsgiDAV scenario checks the same cross-version reconstruction through the
+published client and immutable v1 preservation. Signatures and trust-anchor
+distribution remain unimplemented; these checks do not certify all review gaps.
 
 Reproduce in a shell with moon, node and the platform C compiler on PATH:
 

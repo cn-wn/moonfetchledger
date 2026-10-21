@@ -51,6 +51,13 @@ credentials, private infrastructure or pre-existing share is needed.
    also refuses a subsequently needed block with a sanitized error and preserves
    every artifact byte. Reconciliation may save the remaining valid coverage;
    this is not a rollback of checkpoint changes.
+5. Publish a derived v2 and its delta metadata using actual upstream PUTs; fetch
+   the metadata over HTTP and verify its independently supplied byte pin. Scan a
+   damaged v1 seed at arbitrary offsets, retain 11655 of 23943 target bytes, then
+   fetch exactly three 4096-byte gaps using the published WebDAV client. Pause
+   after the first block, construct a fresh Source, resume two remaining blocks,
+   verify complete SHA-256 and export v2 while preserving v1. Every block callback
+   checks that the already-saved MFL1 checkpoint parses with the new identity.
 
 This proves the tested anonymous HTTP configuration on WsgiDAV/Cheroot. It does
 not certify all WebDAV products, TLS, authentication, proxies, multi-range GET,

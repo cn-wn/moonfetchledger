@@ -19,6 +19,8 @@ pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int32, 
 
 pub async fn export_verified(@moonfetchledger.ObjectSpec, String, String) -> Unit
 
+pub async fn fetch_delta_reference(String, String, request_timeout_ms? : Int32) -> @moonfetchledger.DeltaReference
+
 pub async fn load_block_reference(@moonfetchledger.ObjectSpec, String, String) -> @moonfetchledger.BlockReference
 
 pub async fn load_delta_reference(String, String) -> @moonfetchledger.DeltaReference
@@ -32,6 +34,8 @@ pub async fn recover_checkpoint(@moonfetchledger.ObjectSpec, String) -> AuditRep
 pub async fn repair_from_local(@moonfetchledger.ObjectSpec, String, String, stop_after_blocks? : Int32, on_progress? : async (LocalRepairProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> LocalRepairReport
 
 pub async fn reuse_from_seed(@moonfetchledger.DeltaReference, String, String) -> SeedReuseReport
+
+pub async fn update_from_seed(@moonfetchledger.DeltaReference, String, seed? : String, resuming? : Bool, export_to? : String, parallel? : Int32, stop_after_blocks? : Int32, max_attempts? : Int32, request_timeout_ms? : Int32, auth? : BearerAuth) -> DeltaUpdateReport
 
 pub async fn write_block_reference(@moonfetchledger.ObjectSpec, String, String, chunk_size? : Int32) -> String
 
@@ -65,6 +69,13 @@ pub struct BearerAuth {
   // private fields
 }
 pub fn BearerAuth::new(String, String, allow_loopback_http? : Bool) -> Self raise HostError
+
+pub struct DeltaUpdateReport {
+  seed : SeedReuseReport?
+  receive : DownloadReport
+  exported : Bool
+} derive(@debug.Debug)
+pub fn DeltaUpdateReport::to_repr(Self) -> @debug.Repr
 
 pub enum DownloadPhase {
   Recovered
