@@ -121,10 +121,12 @@ not continuously during an already authorized transfer. The library's clock is
 caller-supplied; the CLI uses the actual system clock with no override option.
 
 Native `cmd/release` implements signing, explicit initialization/recovery and
-public-artifact updates. It does not accept consumer-supplied identity/digest or
+public- or private-artifact updates. It does not accept consumer-supplied identity/digest or
 chunk overrides. `--metadata LOCAL_DELTA` is an explicit offline alternative to
-the signed URL; its bytes must still match the signed pin. Private-artifact callers
-can compose the lower-level state callback and authenticated HTTP/WebDAV APIs.
+the signed URL; its bytes must still match the signed pin. Private artifacts can
+use the optional resource-bound `auth` credential directly. Authenticated WebDAV
+can still be composed through the lower-level state callback. Announcement and
+delta metadata fetching remain public.
 
 ```text
 moon run --target native cmd/release -- --help
@@ -155,3 +157,29 @@ refusal before metadata/artifact requests, another-process resume downloading
 only the remaining two blocks, exact 23943-byte delivery, preserved old/key files,
 stopped-origin zero-download reopen and explicit interrupted-state recovery.
 Public test keys are used only within its temporary directory.
+
+## Private artifacts with public signed metadata
+
+Pass an existing `BearerAuth` as `auth=...` to `host.update_signed_release`.
+It must be bound to the EXACT artifact URL in the authenticated delta index.
+The receiver checks that binding before creating seed staging, even when every
+block can be reused. A valid release can remain accepted after a binding/auth
+failure; correct credentials and retry it without resetting state.
+
+For the CLI, add `--bearer-env TOKEN_VARIABLE --artifact-url EXACT_EXPECTED_URL`.
+Both are required together. Only the environment variable NAME enters argv;
+its value remains transient and is never checkpointed, signed, reported or sent
+to announcement/delta URLs. Supplying an explicit expected artifact URL prevents
+a publisher-selected different destination from receiving that credential.
+Production credentials require HTTPS with existing system certificate checks.
+`--allow-loopback-auth` permits only literal 127.0.0.1 HTTP for local tests.
+These controls are refused in sign/init/recover modes. No OAuth refresh,
+credential acquisition, authenticated metadata endpoints or credential redirects.
+
+Rotate an expired credential outside this library, then repeat the SAME signed
+release with `--resume`. A 401/403 is fatal for that attempt, preserves saved
+content/coverage and is not retried with the failed token. The actual-process
+signed demo now requires private artifact access, verifies public metadata
+receives no Authorization, rotates a test token after pause, rejects its expired
+value without content changes and completes with the new value. Receipt,
+checkpoint and metadata are checked for absence of both token values.

@@ -19,10 +19,19 @@ fn hash(bytes : Bytes) -> String {
 }
 
 ///|
-async fn invoke(command : String, args : Array[String]) -> @shell.Output {
+async fn invoke(
+  command : String,
+  args : Array[String],
+  token~ : String = "signed-fixture-one",
+) -> @shell.Output {
   let options = ["run", "--target", "native", "-j", "2", "cmd/" + command, "--"]
   options.append(args)
-  @shell.Cmd("moon", options).output(timeout_ms=120000)
+  @shell.Cmd(
+    "moon",
+    options,
+    env={ "MFL_SIGNED_TOKEN": token },
+    inherit_env=true,
+  ).output(timeout_ms=120000)
 }
 
 ///|
@@ -67,6 +76,8 @@ async fn main {
   let mut announcement = b""
   let mut metadata = b""
   let mut damage_metadata = false
+  let mut expected_token = "signed-fixture-one"
+  let mut auth_failures = 0
   @async.with_task_group(group => {
     let server = @http.Server::Server(@socket.Addr::parse("127.0.0.1:0"))
     defer server.close()
@@ -88,6 +99,7 @@ async fn main {
           defer conn.close()
           assert_eq(request.headers.get("Accept-Encoding"), Some("identity"))
           if request.path == "/release" || request.path == "/metadata" {
+            assert_true(request.headers.get("Authorization") is None)
             let bytes = if request.path == "/release" {
               announcement_gets += 1
               announcement
@@ -108,6 +120,16 @@ async fn main {
             return
           }
           assert_eq(request.path, "/v2")
+          if request.headers.get("Authorization") !=
+            Some("Bearer " + expected_token) {
+            auth_failures += 1
+            conn.send_response(401, "Unauthorized", extra_headers={
+              "Content-Length": "0",
+              "Connection": "close",
+            })
+            conn.end_response()
+            return
+          }
           assert_eq(request.headers.get("If-Range"), Some("\"v2\""))
           let bounds = request.headers.get("Range").unwrap()[6:]
             .split("-")
@@ -190,6 +212,13 @@ async fn main {
     assert_true(invoke("release", init).exit_code() != 0)
     let remote = common.copy()
     remote.append([
+      "--bearer-env",
+      "MFL_SIGNED_TOKEN",
+      "--artifact-url",
+      base + "/v2",
+      "--allow-loopback-auth",
+    ])
+    remote.append([
       "--release-url",
       base + "/release",
       "--output",
@@ -232,6 +261,16 @@ async fn main {
     // A valid signature authorizes version 2 even though its metadata transfer
     // failed. Never reset state; retry exactly that same authorized release.
     damage_metadata = false
+    let wrong_destination = new_args.map(arg => {
+      if arg == base + "/v2" {
+        "https://other.test/artifact"
+      } else {
+        arg
+      }
+    })
+    assert_true(invoke("release", wrong_destination).exit_code() != 0)
+    assert_true(!@fs.exists(output) && !@fs.exists(output + ".mfl.lock"))
+    assert_eq(requests.length(), 0)
     let paused = first_record(invoke("release", new_args))
     assert_true(
       paused
@@ -260,7 +299,16 @@ async fn main {
     assert_eq(@fs.read_file(output).binary(), partial)
     assert_eq(@fs.read_file(output + ".mfl").binary(), checkpoint)
     announcement = v2_release
-    let complete = first_record(invoke("release", continued))
+    expected_token = "signed-fixture-two"
+    let expired_token = invoke("release", continued)
+    assert_true(expired_token.exit_code() != 0)
+    assert_true(!expired_token.stderr().contains("signed-fixture-one"))
+    assert_eq(auth_failures, 1)
+    assert_eq(@fs.read_file(output).binary(), partial)
+    assert_eq(@fs.read_file(output + ".mfl").binary(), checkpoint)
+    let complete = first_record(
+      invoke("release", continued, token="signed-fixture-two"),
+    )
     assert_true(
       complete
       is [
@@ -278,6 +326,13 @@ async fn main {
     assert_eq(@fs.read_file(private_path).binary(), private_seed)
     assert_eq(@fs.read_file(public_path).binary(), public_key)
     assert_eq(@fs.read_file(metadata_path).binary(), metadata)
+    for path in [state, output + ".mfl", metadata_path] {
+      let text = @fs.read_file(path).text()
+      assert_true(
+        !text.contains("signed-fixture-one") &&
+        !text.contains("signed-fixture-two"),
+      )
+    }
     // A complete session can reopen after the origin is stopped with explicit
     // local signed descriptor/metadata and the SAME independently pinned key.
     ignore(@http.get(base + "/stop"))
@@ -329,6 +384,6 @@ async fn main {
     invoke("release", pending_resume).check()
   })
   println(
-    "signed release CLI verified: real publisher/sign/init -> remote signature and hash-bound metadata -> 11655-byte reuse -> saved pause -> validly signed rollback refusal before metadata/artifact requests -> process resume and exact delivery; bad signature/expiry/metadata/options preserved inputs; stopped-origin reopen and explicit state recovery",
+    "signed private update CLI verified: public signature/metadata without credential forwarding, exact artifact credential binding, 11655-byte reuse, saved pause, rollback refusal, expired-token preservation, credential rotation and process resume; exact delivery, stopped-origin reopen and state recovery",
   )
 }

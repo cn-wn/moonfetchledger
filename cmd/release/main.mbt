@@ -44,11 +44,52 @@ fn report(phase : String, fields : Array[String]) -> Unit {
 }
 
 ///|
+fn artifact_auth(
+  values : Map[String, String],
+  allow_loopback : Bool,
+) -> @host.BearerAuth? raise {
+  if values.contains("--bearer-env") != values.contains("--artifact-url") {
+    fail(
+      "--bearer-env and --artifact-url must be supplied together to bind the credential destination",
+    )
+  }
+  match values.get("--bearer-env") {
+    None => None
+    Some(name) => {
+      if name.is_empty() || name.length() > 128 {
+        fail("Bearer variable name must be an ASCII environment identifier")
+      }
+      let mut first = true
+      for c in name {
+        if !((c >= 'a' && c <= 'z') ||
+          (c >= 'A' && c <= 'Z') ||
+          c == '_' ||
+          (!first && c >= '0' && c <= '9')) {
+          fail("Bearer variable name must be an ASCII environment identifier")
+        }
+        first = false
+      }
+      let token = @env.get_env_var(name).unwrap_or_else(() => {
+        fail("Bearer environment variable is unset")
+      })
+      Some(
+        @host.BearerAuth::new(
+          required(values, "--artifact-url"),
+          token,
+          allow_loopback_http=allow_loopback,
+        ),
+      )
+    }
+  }
+}
+
+///|
 async fn run() -> Unit {
   let args = @env.args()
   let values : Map[String, String] = Map([])
   let mut mode = "update"
   let mut resuming = false
+  let mut loopback_auth = false
   for i = 1; i < args.length(); {
     let flag = args[i]
     if flag == "--" {
@@ -67,6 +108,9 @@ async fn run() -> Unit {
       println(
         "Public keys require independent provisioning. Uses the system Unix clock; there is no clock override. Protect state and .lock/.next; never reset to bypass rollback errors. No key rotation or installed-file replacement.",
       )
+      println(
+        "Private artifacts: --bearer-env NAME --artifact-url EXACT_EXPECTED_URL; credentials are never sent to announcement/metadata URLs. --allow-loopback-auth is only for explicit 127.0.0.1 HTTP tests.",
+      )
       return
     }
     if ["--sign", "--init-state", "--recover-state"].contains(flag) {
@@ -83,12 +127,19 @@ async fn run() -> Unit {
       resuming = true
       continue i + 1
     }
+    if flag == "--allow-loopback-auth" {
+      if loopback_auth {
+        fail("duplicate --allow-loopback-auth")
+      }
+      loopback_auth = true
+      continue i + 1
+    }
     if ![
         "--private-seed-file", "--descriptor", "--product", "--channel", "--version",
         "--issued-at", "--expires-at", "--metadata-url", "--metadata-sha256", "--public-key-file",
         "--state", "--minimum-version", "--release", "--release-url", "--seed", "--output",
         "--metadata", "--export-to", "--parallel", "--stop-after-blocks", "--max-attempts",
-        "--request-timeout-ms",
+        "--request-timeout-ms", "--bearer-env", "--artifact-url",
       ].contains(flag) ||
       i + 1 >= args.length() ||
       values.contains(flag) {
@@ -111,6 +162,7 @@ async fn run() -> Unit {
       "--public-key-file", "--product", "--channel", "--state", "--minimum-version",
       "--release", "--release-url", "--seed", "--output", "--metadata", "--export-to",
       "--parallel", "--stop-after-blocks", "--max-attempts", "--request-timeout-ms",
+      "--bearer-env", "--artifact-url",
     ]
   }
   for key in values.keys() {
@@ -120,6 +172,14 @@ async fn run() -> Unit {
   }
   if resuming && mode != "update" {
     fail("--resume is only valid for updates")
+  }
+  if loopback_auth && (mode != "update" || !values.contains("--bearer-env")) {
+    fail("--allow-loopback-auth requires an update with --bearer-env")
+  }
+  let auth = if mode == "update" {
+    artifact_auth(values, loopback_auth)
+  } else {
+    None
   }
   let product = required(values, "--product")
   let channel = required(values, "--channel")
@@ -205,6 +265,7 @@ async fn run() -> Unit {
     stop_after_blocks?=budget,
     max_attempts=attempts,
     request_timeout_ms=timeout,
+    auth?,
   )
   report(if result.update.receive.complete { "complete" } else { "paused" }, [
     result.version.to_string(),

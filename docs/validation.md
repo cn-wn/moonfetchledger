@@ -1,5 +1,11 @@
 # Validation record — 2026-10-22
 
+Signed private-artifact support adds two native tests (126 native total): exact
+resource binding before staging, zero-fetch reuse without secret persistence,
+and actual HTTP pause/401/no-retry/credential rotation/resume/export. The signed
+CLI demo also verifies no credential forwarding to public metadata and expired
+token refusal with unchanged artifact/checkpoint bytes.
+
 Multi-seed composition adds two portable tests (including all 16x16 block-mask
 unions, source priority, partition, mismatched metadata/layout and 32-input limit)
 and two native lock/preservation/whole-delivery/sparse-gap tests: 47 portable /

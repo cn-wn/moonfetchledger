@@ -128,6 +128,7 @@ pub async fn update_signed_release(
   stop_after_blocks? : Int32,
   max_attempts~ : Int32 = 1,
   request_timeout_ms~ : Int32 = 30000,
+  auth? : BearerAuth,
 ) -> SignedUpdateReport {
   let checked = trust.verify(signed_release, now)
   validate_delta_url(checked.release.metadata_url)
@@ -231,6 +232,7 @@ pub async fn update_signed_release(
       stop_after_blocks?,
       max_attempts~,
       request_timeout_ms~,
+      auth?,
     )
     {
       version: approved.release.version,
