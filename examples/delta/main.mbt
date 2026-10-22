@@ -34,6 +34,9 @@ async fn main {
   )
   // In a real deployment obtain pin through an independent trusted channel.
   let reference = @host.load_delta_reference(metadata, pin)
+  let preview = @host.preview_seed(reference, seed)
+  assert_eq(preview.download_bytes(), 12288L)
+  assert_true(!@fs.exists(output) && !@fs.exists(output + ".mfl.lock"))
   let scanner = reference.scanner()
   scanner.push(old_bytes)
   let plan = scanner.finish()
@@ -41,6 +44,7 @@ async fn main {
   let report = @host.reuse_from_seed(reference, seed, output)
   assert_true(report.reused_bytes > 0L && report.reused_bytes < spec.length)
   assert_eq(report.reused_bytes, plan.reused_bytes)
+  assert_eq(preview.missing_ranges(), report.missing_ranges)
   assert_eq(@host.audit(spec, output).confirmed_bytes, report.reused_bytes)
   // Offline completion from a fully verified publisher copy. Network completion
   // can instead use the existing HTTP/WebDAV receiver and the same MFL1 session.

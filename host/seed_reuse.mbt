@@ -129,14 +129,7 @@ pub async fn reuse_from_seed(
     raise InvalidInput("seed must remain regular")
   }
   let size = source.size()
-  let scanner = reference.scanner()
-  let mut offset = 0L
-  while offset < size {
-    let length = (size - offset).min(65536L).to_int()
-    scanner.push(source.read_exactly_at(length, position=offset))
-    offset += length.to_int64()
-  }
-  let plan = scanner.finish()
+  let plan = scan_seed_file(reference, source)
   if source.size() != size {
     raise InvalidInput(
       "seed length changed while scanning; retry with stable seed",

@@ -36,6 +36,8 @@ pub async fn load_release(String) -> Bytes
 
 pub async fn load_release_trust(String, String, String, minimum_version? : Int64) -> @release.ReleaseTrust
 
+pub async fn preview_seed(@moonfetchledger.DeltaReference, String) -> @moonfetchledger.SeedPlan
+
 pub async fn receive_from(@moonfetchledger.ObjectSpec, String, fetch_range~ : async (@moonfetchledger.ByteRange) -> ReceivedBlock, chunk_size? : Int32, parallel? : Int32, stop_after_blocks? : Int32, on_progress? : async (DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> DownloadReport
 
 pub async fn recover_checkpoint(@moonfetchledger.ObjectSpec, String) -> AuditReport

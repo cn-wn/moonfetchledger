@@ -1,5 +1,8 @@
 # MoonFetchLedger
 
+[Read-only update previews](docs/update-preview.md) show reusable blocks and
+logical missing bytes before creating staging or downloading artifact content.
+
 Portable [signed release authorization](docs/signed-releases.md) binds an
 independently pinned publisher key, product/channel, version and expiry to the
 exact delta metadata. It reuses the published MoonBit Ed25519 package; it is

@@ -32,6 +32,7 @@ async fn run() -> Unit {
   let args = @env.args()
   let values : Map[String, String] = Map([])
   let mut publishing = false
+  let mut previewing = false
   let mut resuming = false
   for i = 1; i < args.length(); {
     let flag = args[i]
@@ -46,7 +47,7 @@ async fn run() -> Unit {
         "update (--metadata FILE | --metadata-url URL) --metadata-sha256 TRUSTED_PIN --seed OLD_FILE --output NEW_STAGING [--export-to NEW_READY] [--parallel 1..16] [--stop-after-blocks N] [--max-attempts 1..8] [--request-timeout-ms 1..120000]",
       )
       println(
-        "Resume with --resume instead of --seed. Metadata pins require independent trust. Signed release metadata and automatic installed-file replacement are not implemented.",
+        "Use --preview with metadata/pin and --seed only for a read-only MFLPLAN1 report. Resume updates with --resume instead of --seed. Pins require independent trust; cmd/release provides signed updates. Installed-file replacement is not implemented.",
       )
       return
     }
@@ -55,6 +56,13 @@ async fn run() -> Unit {
         fail("duplicate --publish")
       }
       publishing = true
+      continue i + 1
+    }
+    if flag == "--preview" {
+      if previewing {
+        fail("duplicate --preview")
+      }
+      previewing = true
       continue i + 1
     }
     if flag == "--resume" {
@@ -77,7 +85,7 @@ async fn run() -> Unit {
     continue i + 2
   }
   if publishing {
-    if resuming {
+    if resuming || previewing {
       fail("--publish and --resume are exclusive")
     }
     for name in values.keys() {
@@ -119,10 +127,22 @@ async fn run() -> Unit {
   if values.contains("--metadata") == values.contains("--metadata-url") {
     fail("choose exactly one of --metadata and --metadata-url")
   }
+  if previewing {
+    if resuming {
+      fail("preview cannot resume or write an update")
+    }
+    for name in values.keys() {
+      if ![
+          "--metadata", "--metadata-url", "--metadata-sha256", "--seed", "--request-timeout-ms",
+        ].contains(name) {
+        fail("unsupported preview option: \{name}")
+      }
+    }
+  }
   if resuming == values.contains("--seed") {
     fail("choose exactly one of --seed and --resume")
   }
-  let output = required(values, "--output")
+  let output = if previewing { "" } else { required(values, "--output") }
   let pin = required(values, "--metadata-sha256")
   let timeout = small(values, "--request-timeout-ms", 30000)
   let parallel = small(values, "--parallel", 4)
@@ -152,6 +172,14 @@ async fn run() -> Unit {
         pin,
         request_timeout_ms=timeout,
       )
+  }
+  if previewing {
+    println(
+      @host.preview_seed(reference, required(values, "--seed"))
+      .to_json()
+      .stringify(),
+    )
+    return
   }
   let report = @host.update_from_seed(
     reference,

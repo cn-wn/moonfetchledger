@@ -1,5 +1,12 @@
 # Validation record — 2026-10-22
 
+Read-only planning adds one portable partition/determinism/snapshot test and one
+native preservation/lock/reconstruction-agreement test (45 portable / 120 native).
+The existing real-data delta example and actual-process delta CLI demo now verify
+preview output before any artifact/staging writes. New local commits are validated
+on Linux with the current stable toolchain; earlier CI links below describe their
+specific pushed revisions and do not certify later unpushed work.
+
 The signed update workflow adds three native integration tests (118 native total):
 signature/control/state-alias refusal before mutation followed by offline delivery
 and reopen; bounded key/announcement loading and no-replace signing; actual HTTP

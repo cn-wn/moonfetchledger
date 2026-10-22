@@ -110,7 +110,10 @@ pub struct SeedPlan {
   reused_bytes : Int64
   // private fields
 }
+pub fn SeedPlan::download_bytes(Self) -> Int64
 pub fn SeedPlan::matches(Self) -> Array[SeedMatch]
+pub fn SeedPlan::missing_ranges(Self) -> Array[ByteRange]
+pub fn SeedPlan::to_json(Self) -> Json
 
 pub struct SeedScanner {
   // private fields

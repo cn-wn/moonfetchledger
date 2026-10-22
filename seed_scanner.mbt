@@ -16,6 +16,7 @@ pub extend SeedMatch with Debug::{to_repr}
 pub struct SeedPlan {
   scanned_bytes : Int64
   reused_bytes : Int64
+  priv spec : ObjectSpec
   priv records : Array[SeedMatch]
 }
 
@@ -168,5 +169,10 @@ pub fn SeedScanner::finish(self : SeedScanner) -> SeedPlan {
       reused += length
     }
   }
-  { scanned_bytes: self.position, reused_bytes: reused, records, }
+  {
+    scanned_bytes: self.position,
+    reused_bytes: reused,
+    spec: self.reference.spec,
+    records,
+  }
 }

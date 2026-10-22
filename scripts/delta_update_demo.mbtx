@@ -137,6 +137,25 @@ async fn main {
     published.check()
     metadata = @fs.read_file(metadata_path).binary()
     let pin = hash(metadata)
+    let preview = invoke([
+      "--preview", "--metadata", metadata_path, "--metadata-sha256", pin, "--seed",
+      seed,
+    ])
+    preview.check()
+    assert_true(
+      records(preview.stdout())[0]
+      is [
+        String("MFLPLAN1"),
+        String("23943"),
+        String("28008"),
+        String("11655"),
+        String("12288"),
+        Array(_),
+        Array(_),
+      ],
+    )
+    assert_true(!@fs.exists(staging) && !@fs.exists(staging + ".mfl.lock"))
+    assert_eq(requests.length(), 0)
     assert_eq(records(published.stdout()), [
       Json::array([
         Json::string("MFLUPDATE1"),
