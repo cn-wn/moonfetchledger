@@ -17,6 +17,7 @@ pub struct SeedPlan {
   scanned_bytes : Int64
   reused_bytes : Int64
   priv spec : ObjectSpec
+  priv chunk_size : Int32
   priv records : Array[SeedMatch]
 }
 
@@ -173,6 +174,7 @@ pub fn SeedScanner::finish(self : SeedScanner) -> SeedPlan {
     scanned_bytes: self.position,
     reused_bytes: reused,
     spec: self.reference.spec,
+    chunk_size: self.reference.chunk_size,
     records,
   }
 }

@@ -145,7 +145,7 @@ pub extend DeltaUpdateReport with Debug::{to_repr}
 /// without consuming a seed. Deliver only after full verification. Preflight
 /// rejects invalid controls and occupied delivery paths before seed/output writes.
 /// Failures retain partial progress; retry with resuming=true and the same metadata.
-pub async fn update_from_seed(
+async fn check_delta_update(
   reference : @ledger.DeltaReference,
   output : String,
   seed? : String,
@@ -156,7 +156,7 @@ pub async fn update_from_seed(
   max_attempts~ : Int32 = 1,
   request_timeout_ms~ : Int32 = 30000,
   auth? : BearerAuth,
-) -> DeltaUpdateReport {
+) -> Unit {
   validate_delta_url(reference.spec.resource)
   if output.is_empty() ||
     parallel < 1 ||
@@ -206,10 +206,63 @@ pub async fn update_from_seed(
       )
     }
   }
+}
+
+///|
+/// Create from one seed or explicitly resume, preserving existing session rules.
+pub async fn update_from_seed(
+  reference : @ledger.DeltaReference,
+  output : String,
+  seed? : String,
+  resuming~ : Bool = false,
+  export_to? : String,
+  parallel~ : Int32 = 4,
+  stop_after_blocks? : Int32,
+  max_attempts~ : Int32 = 1,
+  request_timeout_ms~ : Int32 = 30000,
+  auth? : BearerAuth,
+) -> DeltaUpdateReport {
+  check_delta_update(
+    reference,
+    output,
+    seed?,
+    resuming~,
+    export_to?,
+    parallel~,
+    stop_after_blocks?,
+    max_attempts~,
+    request_timeout_ms~,
+    auth?,
+  )
   let staged = match seed {
     Some(path) => Some(reuse_from_seed(reference, path, output))
     None => None
   }
+  finish_delta_update(
+    reference,
+    output,
+    staged,
+    export_to?,
+    parallel~,
+    stop_after_blocks?,
+    max_attempts~,
+    request_timeout_ms~,
+    auth?,
+  )
+}
+
+///|
+async fn finish_delta_update(
+  reference : @ledger.DeltaReference,
+  output : String,
+  staged : SeedReuseReport?,
+  export_to? : String,
+  parallel~ : Int32,
+  stop_after_blocks? : Int32,
+  max_attempts~ : Int32,
+  request_timeout_ms~ : Int32,
+  auth? : BearerAuth,
+) -> DeltaUpdateReport {
   let received = download(
     reference.spec,
     output,
@@ -227,4 +280,46 @@ pub async fn update_from_seed(
     false
   }
   { seed: staged, receive: received, exported, }
+}
+
+///|
+/// Initial update from 1..32 ordered seeds; resume through update_from_seed with
+/// resuming=true and no seeds. Controls/delivery are checked before staging.
+pub async fn update_from_seeds(
+  reference : @ledger.DeltaReference,
+  seeds : Array[String],
+  output : String,
+  export_to? : String,
+  parallel~ : Int32 = 4,
+  stop_after_blocks? : Int32,
+  max_attempts~ : Int32 = 1,
+  request_timeout_ms~ : Int32 = 30000,
+  auth? : BearerAuth,
+) -> DeltaUpdateReport {
+  if seeds.is_empty() || seeds.length() > 32 {
+    raise InvalidInput("update requires 1..32 seeds")
+  }
+  check_delta_update(
+    reference,
+    output,
+    seed=seeds[0],
+    export_to?,
+    parallel~,
+    stop_after_blocks?,
+    max_attempts~,
+    request_timeout_ms~,
+    auth?,
+  )
+  let staged = reuse_from_seeds(reference, seeds, output)
+  finish_delta_update(
+    reference,
+    output,
+    Some(staged),
+    export_to?,
+    parallel~,
+    stop_after_blocks?,
+    max_attempts~,
+    request_timeout_ms~,
+    auth?,
+  )
 }

@@ -1,5 +1,11 @@
 # Validation record — 2026-10-22
 
+Multi-seed composition adds two portable tests (including all 16x16 block-mask
+unions, source priority, partition, mismatched metadata/layout and 32-input limit)
+and two native lock/preservation/whole-delivery/sparse-gap tests: 47 portable /
+124 native total. The actual-process `seed_pool_demo.mbtx` combines two incomplete
+USGS-derived seeds and delivers the exact target without artifact requests.
+
 Read-only planning adds one portable partition/determinism/snapshot test and one
 native preservation/lock/reconstruction-agreement test (45 portable / 120 native).
 The existing real-data delta example and actual-process delta CLI demo now verify

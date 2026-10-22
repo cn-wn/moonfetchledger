@@ -1,0 +1,101 @@
+///|
+import {
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/crypto",
+}
+
+///|
+async fn invoke(args : Array[String]) -> @shell.Output {
+  let command = ["run", "--target", "native", "-j", "2", "cmd/update", "--"]
+  command.append(args)
+  @shell.Cmd("moon", command).output(timeout_ms=120000)
+}
+
+///|
+async fn main {
+  let data = @fs.read_file("fixtures/earthquakes-2024-01-01.csv").binary()
+  let dir = @fs.tmpdir(prefix="mfl-pool-cli-")
+  defer @fs.rmdir(dir, recursive=true)
+  let a = b"v0\n" + data[:16384].to_owned()
+  let b = b"v1\n" + data[8192:].to_owned()
+  @fs.write_file(dir + "/source", data)
+  @fs.write_file(dir + "/v0", a)
+  @fs.write_file(dir + "/v1", b)
+  invoke([
+    "--publish",
+    "--source",
+    dir + "/source",
+    "--metadata",
+    dir + "/index",
+    "--url",
+    "https://example.test/data",
+    "--length",
+    data.length().to_string(),
+    "--etag",
+    "\"v2\"",
+    "--sha256",
+    @crypto.bytes_to_hex_string(@crypto.sha256(data)),
+    "--chunk-size",
+    "4096",
+  ]).check()
+  let pin = @crypto.bytes_to_hex_string(
+    @crypto.sha256(@fs.read_file(dir + "/index").binary()),
+  )
+  let base = [
+    "--metadata",
+    dir + "/index",
+    "--metadata-sha256",
+    pin,
+    "--seed",
+    dir + "/v0",
+    "--seed",
+    dir + "/v1",
+  ]
+  let preview = base.copy()
+  preview.push("--preview")
+  let before = @fs.readdir(dir)
+  let planned = invoke(preview)
+  planned.check()
+  assert_true(
+    @json.parse(planned.stdout().trim())
+    is [
+      String("MFLPOOL1"),
+      String("28008"),
+      String(_),
+      String("28008"),
+      String("0"),
+      Array(_),
+      Array(_),
+      Array([]),
+    ],
+  )
+  assert_eq(@fs.readdir(dir), before)
+  let args = base.copy()
+  args.append(["--output", dir + "/staging", "--export-to", dir + "/ready"])
+  let bad = args.copy()
+  bad.append(["--parallel", "0"])
+  assert_true(invoke(bad).exit_code() != 0)
+  assert_true(!@fs.exists(dir + "/staging.mfl.lock"))
+  let result = invoke(args)
+  result.check()
+  let lines = result.stdout().trim().split("\n").collect()
+  assert_true(
+    @json.parse(lines[1])
+    is [
+      String("MFLUPDATE1"),
+      String("complete"),
+      String("28008"),
+      String("0"),
+      String("28008"),
+    ],
+  )
+  assert_eq(@fs.read_file(dir + "/ready").binary(), data)
+  assert_eq(@fs.read_file(dir + "/v0").binary(), a)
+  assert_eq(@fs.read_file(dir + "/v1").binary(), b)
+  println(
+    "multi-seed CLI verified: two incomplete old versions jointly reconstruct and export all 28008 USGS bytes, read-only union preview, zero artifact downloads and unchanged seeds",
+  )
+}

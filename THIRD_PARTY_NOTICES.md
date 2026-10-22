@@ -84,6 +84,11 @@ No additional upstream code/test suite or cryptographic signature code was copie
   APIs; no external recovery command or test suite was copied.
 
 Dependencies retain copyright/license notices in their own distribution.
+- The multi-seed composition, shared reconstruction, JSON reports and exhaustive
+  union/preservation tests are project-authored Apache-2.0. Multiple input files
+  are an established zsync use case (https://github.com/cph6/zsync); no zsync
+  implementation, file format or tests were copied. The CLI demo derives two
+  incomplete seeds from the existing public-domain USGS snapshot.
 - Update preview reports, CLI integration and partition/preservation tests are
   project-authored Apache-2.0, using the existing scanner, filesystem APIs and
   public-domain USGS-derived fixture. No external planning implementation copied.

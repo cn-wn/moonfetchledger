@@ -31,6 +31,7 @@ fn small(
 async fn run() -> Unit {
   let args = @env.args()
   let values : Map[String, String] = Map([])
+  let seeds : Array[String] = []
   let mut publishing = false
   let mut previewing = false
   let mut resuming = false
@@ -47,7 +48,7 @@ async fn run() -> Unit {
         "update (--metadata FILE | --metadata-url URL) --metadata-sha256 TRUSTED_PIN --seed OLD_FILE --output NEW_STAGING [--export-to NEW_READY] [--parallel 1..16] [--stop-after-blocks N] [--max-attempts 1..8] [--request-timeout-ms 1..120000]",
       )
       println(
-        "Use --preview with metadata/pin and --seed only for a read-only MFLPLAN1 report. Resume updates with --resume instead of --seed. Pins require independent trust; cmd/release provides signed updates. Installed-file replacement is not implemented.",
+        "Use --preview with metadata/pin and --seed only for a read-only report. Repeat --seed for up to 32 ordered files (MFLPOOL1). Resume updates with --resume and no seeds. Pins require independent trust; cmd/release provides signed updates. Installed-file replacement is not implemented.",
       )
       return
     }
@@ -71,6 +72,14 @@ async fn run() -> Unit {
       }
       resuming = true
       continue i + 1
+    }
+    if flag == "--seed" && i + 1 < args.length() {
+      if seeds.length() >= 32 {
+        fail("at most 32 seeds are supported")
+      }
+      seeds.push(args[i + 1])
+      values[flag] = args[i + 1]
+      continue i + 2
     }
     if ![
         "--source", "--metadata", "--metadata-url", "--metadata-sha256", "--url",
@@ -175,23 +184,38 @@ async fn run() -> Unit {
   }
   if previewing {
     println(
-      @host.preview_seed(reference, required(values, "--seed"))
-      .to_json()
-      .stringify(),
+      if seeds.length() == 1 {
+        @host.preview_seed(reference, seeds[0]).to_json().stringify()
+      } else {
+        @host.preview_seeds(reference, seeds).to_json().stringify()
+      },
     )
     return
   }
-  let report = @host.update_from_seed(
-    reference,
-    output,
-    seed?=values.get("--seed"),
-    resuming~,
-    export_to?=values.get("--export-to"),
-    parallel~,
-    stop_after_blocks?=budget,
-    max_attempts=attempts,
-    request_timeout_ms=timeout,
-  )
+  let report = if seeds.length() > 1 {
+    @host.update_from_seeds(
+      reference,
+      seeds,
+      output,
+      export_to?=values.get("--export-to"),
+      parallel~,
+      stop_after_blocks?=budget,
+      max_attempts=attempts,
+      request_timeout_ms=timeout,
+    )
+  } else {
+    @host.update_from_seed(
+      reference,
+      output,
+      seed?=values.get("--seed"),
+      resuming~,
+      export_to?=values.get("--export-to"),
+      parallel~,
+      stop_after_blocks?=budget,
+      max_attempts=attempts,
+      request_timeout_ms=timeout,
+    )
+  }
   if report.seed is Some(seed) {
     println(
       Json::array([

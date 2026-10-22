@@ -1,16 +1,21 @@
 ///|
 /// Coalesced complement of verified reusable target blocks. Fresh snapshot.
 pub fn SeedPlan::missing_ranges(self : SeedPlan) -> Array[ByteRange] {
+  target_gaps(self.spec.length, self.records.iter().map(r => r.target))
+}
+
+///|
+fn target_gaps(length : Int64, ranges : Iter[ByteRange]) -> Array[ByteRange] {
   let gaps = []
   let mut cursor = 0L
-  for record in self.records {
-    if cursor < record.target.start {
-      gaps.push({ start: cursor, end: record.target.start, })
+  for range in ranges {
+    if cursor < range.start {
+      gaps.push({ start: cursor, end: range.start, })
     }
-    cursor = record.target.end
+    cursor = range.end
   }
-  if cursor < self.spec.length {
-    gaps.push({ start: cursor, end: self.spec.length, })
+  if cursor < length {
+    gaps.push({ start: cursor, end: length, })
   }
   gaps
 }
