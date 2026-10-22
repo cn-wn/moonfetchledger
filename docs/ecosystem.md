@@ -58,8 +58,17 @@ reconstructs a regular-file MFL1 session for existing download clients, without
 implementing Git objects, packfiles or Hub caches. Searches included MoonBit,
 zsync, rsync, delta, file update, rolling checksum and seed. No search is an
 ecosystem-wide absence proof; new/unindexed implementations remain uncertain.
-See [the implemented boundary](delta-update.md). Metadata signatures and automated
-trust-anchor distribution remain future work. Bounded remote metadata fetching
+See [the implemented boundary](delta-update.md). Signed publisher authorization
+now reuses `hustcer/ed25519@0.6.1` rather than reproducing its cryptographic API.
+Its public boundary is signing/verifying an update's product/channel, version,
+validity and metadata pin. The Apache-2.0 upstream was last pushed 2026-10-13
+when checked 2026-10-22; its `SigningKey`/`VerifyingKey` and generic byte-signature
+APIs are not replaced here (https://github.com/hustcer/mbt-ed25519).
+Queries: MoonBit signed update metadata, TUF, Ed25519, zsync. The TUF specification
+(https://github.com/theupdateframework/specification/blob/master/tuf-spec.md)
+informs threat boundaries, not implementation or format compatibility. No code
+or tests were copied, and these searches cannot establish ecosystem uniqueness.
+Automatic trust-anchor distribution remains future work. Bounded remote metadata fetching
 with an independently supplied SHA-256 pin and the complete update workflow are
 implemented; an adjacent untrusted pin is not a trust bootstrap.
 
@@ -87,5 +96,5 @@ implemented; an adjacent untrusted pin is not a trust bootstrap.
   未发布或未被索引的实现以及后续版本变化仍可能影响边界判断。
 - 代码、数据和依赖来源见 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md)。
   项目属于在已有 MoonBit 客户端上构建的功能扩展，账本逻辑独立实现；
-  非 WebDAV/modelhub 的移植或分叉。签名元数据、浏览器存储和 modelhub
+  非 WebDAV/modelhub 的移植或分叉。签名发布描述现已实现；浏览器存储和 modelhub
   专用适配均未实现，不能作为当前集成成果申报。

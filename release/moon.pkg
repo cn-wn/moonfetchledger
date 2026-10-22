@@ -1,0 +1,12 @@
+import {
+  "cn-wn/moonfetchledger" @ledger,
+  "hustcer/ed25519",
+  "moonbitlang/core/json",
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/core/string" @strconv,
+}
+
+import {
+  "hustcer/ed25519",
+  "moonbitlang/x/crypto",
+} for "test"

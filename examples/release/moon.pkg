@@ -1,0 +1,7 @@
+import {
+  "cn-wn/moonfetchledger" @ledger,
+  "cn-wn/moonfetchledger/release" @signed,
+  "hustcer/ed25519",
+}
+
+pkgtype(kind: "executable")

@@ -1,4 +1,13 @@
-# Validation record — 2026-10-21
+# Validation record — 2026-10-22
+
+The signed-release milestone adds four portable black-box tests (44 portable /
+111 native total). They cover deterministic serialization/signing and checked
+round trips, wrong publisher/product/channel/version, inclusive issuance and
+exclusive expiry, Int64 endpoints, malformed/noncanonical/extra data including
+valid signatures over unsupported payloads, domain separation, invalid keys and
+recovery after rejection. `examples/release` runs on Wasm and native in the
+standard verification script. Cryptography is the unmodified pinned
+`hustcer/ed25519@0.6.1`; no constant-time or audit claim is made.
 
 The cross-version seed milestone uses the current official stable CLI/runner,
 downloaded into an isolated Linux toolchain. The compiler is unchanged from the

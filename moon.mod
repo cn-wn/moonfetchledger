@@ -38,4 +38,5 @@ import {
   "moonbitlang/async@0.22.4",
   "q2316367743/webdav@0.1.0",
   "q2316367743/moonhttp@0.5.0",
+  "hustcer/ed25519@0.6.1",
 }

@@ -1,5 +1,10 @@
 # MoonFetchLedger
 
+Portable [signed release authorization](docs/signed-releases.md) binds an
+independently pinned publisher key, product/channel, version and expiry to the
+exact delta metadata. It reuses the published MoonBit Ed25519 package; it is
+neither a new crypto implementation nor TUF-compatible metadata.
+
 `cn-wn/moonfetchledger` is a MoonBit cross-version file update and integrity
 recovery layer for existing download clients. Its [delta workflow](docs/delta-update.md)
 finds verified target blocks at arbitrary offsets in old files, stages sparse

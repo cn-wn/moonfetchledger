@@ -1,0 +1,48 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "cn-wn/moonfetchledger/release"
+
+import {
+  "moonbitlang/core/debug",
+}
+
+// Values
+
+// Errors
+pub suberror ReleaseError {
+  InvalidRelease(String)
+  UntrustedRelease(String)
+} derive(@debug.Debug)
+pub fn ReleaseError::to_repr(Self) -> @debug.Repr
+
+// Types and methods
+pub struct ApprovedRelease {
+  release : Release
+  payload_sha256 : String
+  key_sha256 : String
+}
+
+pub struct Release {
+  product : String
+  channel : String
+  version : Int64
+  issued_at : Int64
+  expires_at : Int64
+  metadata_url : String
+  metadata_sha256 : String
+}
+pub fn Release::new(String, String, Int64, Int64, Int64, String, String) -> Self raise ReleaseError
+pub fn Release::sign(Self, Bytes) -> Bytes raise ReleaseError
+
+pub struct ReleaseTrust {
+  product : String
+  channel : String
+  minimum_version : Int64
+  key_sha256 : String
+  // private fields
+}
+pub fn ReleaseTrust::new(Bytes, String, String, minimum_version? : Int64) -> Self raise ReleaseError
+pub fn ReleaseTrust::verify(Self, Bytes, Int64) -> ApprovedRelease raise ReleaseError
+
+// Type aliases
+
+// Traits

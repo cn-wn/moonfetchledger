@@ -84,6 +84,14 @@ No additional upstream code/test suite or cryptographic signature code was copie
   APIs; no external recovery command or test suite was copied.
 
 Dependencies retain copyright/license notices in their own distribution.
+- `hustcer/ed25519@0.6.1`, Apache-2.0:
+  https://github.com/hustcer/mbt-ed25519 and
+  https://mooncakes.io/docs/hustcer/ed25519%400.6.1 . Used unmodified for plain
+  Ed25519 signing/key validation/verification. The publisher policy, MFLRELEASE1
+  schema, application domain, examples and tests are project-authored Apache-2.0;
+  no upstream signature implementation or test cases were copied. Deterministic
+  demonstration seeds are public project-authored test data. Upstream is
+  unaudited and not constant-time; no stronger assurance is claimed here.
 - The optional real-server integration installs unmodified WsgiDAV/Cheroot and
   their pinned dependencies in an isolated Python environment. Versions, source
   links and all primary/bundled-license qualifications are recorded in

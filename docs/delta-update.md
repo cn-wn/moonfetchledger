@@ -126,9 +126,10 @@ after the origin stops with no artifact requests. The optional WsgiDAV integrati
 also publishes/fetches actual metadata and repairs these cross-version gaps through
 the published upstream WebDAV client.
 
-Release signatures, trust-anchor bootstrap, key rotation, anti-rollback, shared
-chunk caching and installed-file replacement remain unimplemented. This milestone
-addresses cross-version reuse and a pinned update workflow, not all review gaps.
+[Signed release authorization](signed-releases.md) can now authenticate the pin
+using an independently provisioned publisher key, product/channel and validity
+policy. Persistent anti-rollback, automatic trust-anchor distribution/rotation,
+shared chunk caching and installed-file replacement remain unimplemented.
 
 ## Sources
 
