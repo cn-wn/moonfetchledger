@@ -92,3 +92,66 @@ cooperating processes only. Restoring an older backup or deleting and explicitly
 reinitializing state defeats this local rollback defense. There is no trusted
 hardware counter, clock service or power-loss/directory-fsync durability claim.
 This is a single-key/product/channel store, not a general TUF trust database.
+
+## Signed publisher-to-consumer workflow
+
+`host.write_signed_release(descriptor, private_seed_file, new_descriptor)` reads
+at most 32 bytes and requires an exact raw Ed25519 seed; it never replaces a key,
+descriptor or pre-existing `.next`. `host.load_release_trust` loads an independently
+provisioned exact raw 32-byte public key. These are binary key files, not hex,
+PEM or OpenSSH containers. Provision a fresh private seed/public key pair offline
+using an appropriate key-generation environment or the existing Ed25519 library;
+this project does not generate deployment keys or change their permissions.
+
+`host.load_release` and `host.fetch_release` return UNTRUSTED announcement bytes,
+not authorization. Reads are bounded to 16384 bytes. HTTP requires an unencoded
+200 without Content-Range; redirects, oversized declared/streamed bodies and
+length changes fail. Timeouts are 1..120000 ms; transport errors redact URLs.
+
+`host.update_signed_release(bytes, trust, state, staging, now=trusted_unix_time,
+seed=old, export_to=new_ready, ...)` verifies the signature/time/scope, validates
+controls and state-path separation, and locks/records acceptance before fetching
+the signed metadata URL. Its SHA-256 must match the signed pin before parsing.
+Then the existing seed/receiver/export workflow handles actual bytes. A valid
+release remains accepted even if metadata or artifact transfer fails. Retry that
+same release, using `resuming=true` only if staging/checkpoint/lock already exist.
+A higher version remains allowed; an older one cannot request metadata/artifact
+bytes through this workflow. Signature validity is checked at operation start,
+not continuously during an already authorized transfer. The library's clock is
+caller-supplied; the CLI uses the actual system clock with no override option.
+
+Native `cmd/release` implements signing, explicit initialization/recovery and
+public-artifact updates. It does not accept consumer-supplied identity/digest or
+chunk overrides. `--metadata LOCAL_DELTA` is an explicit offline alternative to
+the signed URL; its bytes must still match the signed pin. Private-artifact callers
+can compose the lower-level state callback and authenticated HTTP/WebDAV APIs.
+
+```text
+moon run --target native cmd/release -- --help
+moon run scripts/signed_update_demo.mbtx
+```
+
+For a deployment, publish target metadata with `cmd/update --publish` first and
+substitute real offline keys, URLs, monotonic version counters and Unix times:
+
+```text
+moon run --target native cmd/release -- --sign --private-seed-file publisher.seed --descriptor v2.release --product mydata --channel stable --version 2 --issued-at ISSUED_UNIX --expires-at EXPIRES_UNIX --metadata-url https://example.test/v2.delta --metadata-sha256 PUBLISHED_DELTA_PIN
+moon run --target native cmd/release -- --init-state --public-key-file publisher.pub --product mydata --channel stable --state release-state
+moon run --target native cmd/release -- --release-url https://example.test/v2.release --public-key-file publisher.pub --product mydata --channel stable --state release-state --seed v1.bin --output staging-v2 --export-to ready-v2
+moon run --target native cmd/release -- --release-url https://example.test/v2.release --public-key-file publisher.pub --product mydata --channel stable --state release-state --resume --output staging-v2 --export-to ready-v2
+```
+
+Keep `release-state`, `.lock` and any interrupted `.next` across runs. Initialization
+is not an update flag. Resolve a pending save explicitly with `--recover-state`
+and the same key/product/channel/minimum version. Canonical MFLSIGNED1 JSON lines
+report signed, initialized, state-recovered, paused/complete and exported phases.
+The private seed contents are never printed or passed as a command-line value.
+
+The self-contained demo uses actual child command processes and a real HTTP
+origin with the existing USGS-derived synthetic v2. It verifies signature/expiry
+refusal before state changes, metadata tampering without staging writes, 11655
+bytes reused, a one-block pause at 15751 bytes, a validly signed old-version
+refusal before metadata/artifact requests, another-process resume downloading
+only the remaining two blocks, exact 23943-byte delivery, preserved old/key files,
+stopped-origin zero-download reopen and explicit interrupted-state recovery.
+Public test keys are used only within its temporary directory.

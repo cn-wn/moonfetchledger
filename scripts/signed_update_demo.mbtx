@@ -1,0 +1,334 @@
+///|
+import {
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/http",
+  "moonbitlang/async@0.22.4/socket",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string" @strconv,
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/x@0.5.5/crypto",
+  "hustcer/ed25519@0.6.1",
+}
+
+///|
+fn hash(bytes : Bytes) -> String {
+  @crypto.bytes_to_hex_string(@crypto.sha256(bytes))
+}
+
+///|
+async fn invoke(command : String, args : Array[String]) -> @shell.Output {
+  let options = ["run", "--target", "native", "-j", "2", "cmd/" + command, "--"]
+  options.append(args)
+  @shell.Cmd("moon", options).output(timeout_ms=120000)
+}
+
+///|
+fn first_record(output : @shell.Output) -> Json raise {
+  output.check()
+  @json.parse(output.stdout().trim().split("\n").collect()[0])
+}
+
+///|
+async fn main {
+  @shell.Cmd("moon", ["build", "--target", "native", "--deny-warn", "-j", "2"]).run(
+    timeout_ms=120000,
+  )
+  let dir = @fs.tmpdir(prefix="mfl-signed-cli-")
+  defer @fs.rmdir(dir, recursive=true)
+  let original = @fs.read_file("fixtures/earthquakes-2024-01-01.csv").binary()
+  let v2 = b"MoonFetchLedger v2\n" +
+    original[8192:16384].to_owned() +
+    b"new-section\n" +
+    original[:4096].to_owned() +
+    original[16384:].to_owned()
+  let private_seed = Bytes::makei(32, i => (31 - i).to_byte()) // PUBLIC TEST DATA ONLY
+  let public_key = @ed25519.derive_public_key(private_seed)
+  let private_path = dir + "/private-seed"
+  let public_path = dir + "/public-key"
+  let metadata_path = dir + "/delta"
+  let state = dir + "/state"
+  let seed = dir + "/old"
+  let output = dir + "/staging"
+  let ready = dir + "/ready"
+  @fs.write_file(private_path, private_seed)
+  @fs.write_file(public_path, public_key)
+  @fs.write_file(dir + "/publisher", v2)
+  @fs.write_file(seed, original)
+  let old = @fs.open(seed, mode=ReadWrite)
+  old.write_at(b"\x00", position=12000L)
+  old.close()
+  let preserved_seed = @fs.read_file(seed).binary()
+  let requests : Array[Int32] = []
+  let mut metadata_gets = 0
+  let mut announcement_gets = 0
+  let mut announcement = b""
+  let mut metadata = b""
+  let mut damage_metadata = false
+  @async.with_task_group(group => {
+    let server = @http.Server::Server(@socket.Addr::parse("127.0.0.1:0"))
+    defer server.close()
+    let base = "http://127.0.0.1:\{server.addr.port()}"
+    let serving = group.spawn(() => {
+      while true {
+        let (conn, _) = server.accept()
+        let request = conn.read_request()
+        if request.path == "/stop" {
+          conn.send_response(200, "OK", extra_headers={
+            "Content-Length": "0",
+            "Connection": "close",
+          })
+          conn.end_response()
+          conn.close()
+          break
+        }
+        group.spawn_bg(allow_failure=true, () => {
+          defer conn.close()
+          assert_eq(request.headers.get("Accept-Encoding"), Some("identity"))
+          if request.path == "/release" || request.path == "/metadata" {
+            let bytes = if request.path == "/release" {
+              announcement_gets += 1
+              announcement
+            } else {
+              metadata_gets += 1
+              if damage_metadata {
+                b"tampered metadata"
+              } else {
+                metadata
+              }
+            }
+            conn.send_response(200, "OK", extra_headers={
+              "Content-Length": bytes.length().to_string(),
+              "Connection": "close",
+            })
+            conn.write(bytes)
+            conn.end_response()
+            return
+          }
+          assert_eq(request.path, "/v2")
+          assert_eq(request.headers.get("If-Range"), Some("\"v2\""))
+          let bounds = request.headers.get("Range").unwrap()[6:]
+            .split("-")
+            .collect()
+          let start = @strconv.parse_int(bounds[0])
+          let end = @strconv.parse_int(bounds[1]) + 1
+          requests.push(start)
+          conn.send_response(206, "Partial Content", extra_headers={
+            "Content-Length": "\{end-start}",
+            "Content-Range": "bytes \{start}-\{end-1}/\{v2.length()}",
+            "ETag": "\"v2\"",
+            "Connection": "close",
+          })
+          conn.write(v2[start:end].to_owned())
+          conn.end_response()
+        })
+      }
+    })
+    invoke("update", [
+      "--publish",
+      "--source",
+      dir + "/publisher",
+      "--metadata",
+      metadata_path,
+      "--url",
+      base + "/v2",
+      "--length",
+      v2.length().to_string(),
+      "--etag",
+      "\"v2\"",
+      "--sha256",
+      hash(v2),
+      "--chunk-size",
+      "4096",
+    ]).check()
+    metadata = @fs.read_file(metadata_path).binary()
+    let issued = (@env.now() / 1000UL).reinterpret_as_int64() - 10L
+    let expires = issued + 3600L
+    for
+      (name, version, end) in [
+        ("v2", 2L, expires),
+        ("v1", 1L, expires),
+        ("expired", 3L, issued + 1L),
+      ] {
+      let result = invoke("release", [
+        "--sign",
+        "--private-seed-file",
+        private_path,
+        "--descriptor",
+        dir + "/" + name,
+        "--product",
+        "earthquakes",
+        "--channel",
+        "stable",
+        "--version",
+        version.to_string(),
+        "--issued-at",
+        issued.to_string(),
+        "--expires-at",
+        end.to_string(),
+        "--metadata-url",
+        base + "/metadata",
+        "--metadata-sha256",
+        hash(metadata),
+      ])
+      assert_true(
+        first_record(result)
+        is [String("MFLSIGNED1"), String("signed"), String(_)],
+      )
+    }
+    let v2_release = @fs.read_file(dir + "/v2").binary()
+    let common = [
+      "--public-key-file", public_path, "--product", "earthquakes", "--channel",
+      "stable", "--state", state,
+    ]
+    let init = common.copy()
+    init.push("--init-state")
+    invoke("release", init).check()
+    let initial = @fs.read_file(state).binary()
+    assert_true(invoke("release", init).exit_code() != 0)
+    let remote = common.copy()
+    remote.append([
+      "--release-url",
+      base + "/release",
+      "--output",
+      output,
+      "--parallel",
+      "1",
+      "--export-to",
+      ready,
+    ])
+    let new_args = remote.copy()
+    new_args.append(["--seed", seed, "--stop-after-blocks", "1"])
+    let before_bad_options = announcement_gets
+    for
+      invalid in [
+        ["--parallel", "2"],
+        ["--resume"],
+        ["--now", "0"],
+        ["--chunk-size", "4096"],
+      ] {
+      let args = new_args.copy()
+      args.append(invalid)
+      assert_true(invoke("release", args).exit_code() != 0)
+    }
+    assert_eq(announcement_gets, before_bad_options)
+    announcement = @utf8.encode(
+      @utf8.decode(v2_release).replace_all(old="earthquakes", new="tampered"),
+    )
+    assert_true(invoke("release", new_args).exit_code() != 0)
+    assert_eq(metadata_gets, 0)
+    assert_eq(@fs.read_file(state).binary(), initial)
+    assert_true(!@fs.exists(output))
+    announcement = @fs.read_file(dir + "/expired").binary()
+    assert_true(invoke("release", new_args).exit_code() != 0)
+    assert_eq(@fs.read_file(state).binary(), initial)
+    announcement = v2_release
+    damage_metadata = true
+    assert_true(invoke("release", new_args).exit_code() != 0)
+    assert_true(!@fs.exists(output) && !@fs.exists(output + ".mfl.lock"))
+    assert_eq(requests.length(), 0)
+    // A valid signature authorizes version 2 even though its metadata transfer
+    // failed. Never reset state; retry exactly that same authorized release.
+    damage_metadata = false
+    let paused = first_record(invoke("release", new_args))
+    assert_true(
+      paused
+      is [
+        String("MFLSIGNED1"),
+        String("paused"),
+        String("2"),
+        String("15751"),
+        String("1"),
+        String(_),
+      ],
+    )
+    assert_eq(requests, [0])
+    assert_true(!@fs.exists(ready))
+    let saved = @fs.read_file(state).binary()
+    let checkpoint = @fs.read_file(output + ".mfl").binary()
+    let partial = @fs.read_file(output).binary()
+    let continued = remote.copy()
+    continued.push("--resume")
+    announcement = @fs.read_file(dir + "/v1").binary()
+    let before_old = metadata_gets
+    assert_true(invoke("release", continued).exit_code() != 0)
+    assert_eq(metadata_gets, before_old)
+    assert_eq(requests, [0])
+    assert_eq(@fs.read_file(state).binary(), saved)
+    assert_eq(@fs.read_file(output).binary(), partial)
+    assert_eq(@fs.read_file(output + ".mfl").binary(), checkpoint)
+    announcement = v2_release
+    let complete = first_record(invoke("release", continued))
+    assert_true(
+      complete
+      is [
+        String("MFLSIGNED1"),
+        String("complete"),
+        String("2"),
+        String("23943"),
+        String("2"),
+        String(_),
+      ],
+    )
+    assert_eq(requests, [0, 8192, 12288])
+    assert_eq(@fs.read_file(ready).binary(), v2)
+    assert_eq(@fs.read_file(seed).binary(), preserved_seed)
+    assert_eq(@fs.read_file(private_path).binary(), private_seed)
+    assert_eq(@fs.read_file(public_path).binary(), public_key)
+    assert_eq(@fs.read_file(metadata_path).binary(), metadata)
+    // A complete session can reopen after the origin is stopped with explicit
+    // local signed descriptor/metadata and the SAME independently pinned key.
+    ignore(@http.get(base + "/stop"))
+    serving.wait()
+    let offline = common.copy()
+    offline.append([
+      "--release",
+      dir + "/v2",
+      "--metadata",
+      metadata_path,
+      "--resume",
+      "--output",
+      output,
+      "--export-to",
+      dir + "/ready-offline",
+    ])
+    assert_true(
+      first_record(invoke("release", offline))
+      is [
+        String("MFLSIGNED1"),
+        String("complete"),
+        String("2"),
+        String("23943"),
+        String("0"),
+        String(_),
+      ],
+    )
+    assert_eq(@fs.read_file(dir + "/ready-offline").binary(), v2)
+    let pending = @fs.read_file(state).binary()
+    @fs.write_file(state + ".next", pending)
+    let pending_resume = common.copy()
+    pending_resume.append([
+      "--release",
+      dir + "/v2",
+      "--metadata",
+      metadata_path,
+      "--resume",
+      "--output",
+      output,
+    ])
+    let pending_result = invoke("release", pending_resume)
+    assert_true(pending_result.exit_code() != 0)
+    assert_true(pending_result.stderr().contains("pending release state"))
+    let recover = common.copy()
+    recover.push("--recover-state")
+    invoke("release", recover).check()
+    assert_eq(@fs.read_file(state).binary(), pending)
+    assert_true(!@fs.exists(state + ".next"))
+    invoke("release", pending_resume).check()
+  })
+  println(
+    "signed release CLI verified: real publisher/sign/init -> remote signature and hash-bound metadata -> 11655-byte reuse -> saved pause -> validly signed rollback refusal before metadata/artifact requests -> process resume and exact delivery; bad signature/expiry/metadata/options preserved inputs; stopped-origin reopen and explicit state recovery",
+  )
+}

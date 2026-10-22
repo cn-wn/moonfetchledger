@@ -51,6 +51,7 @@ load_block_reference 提供有字节上限的原生文件工作流；audit_with_
 - [生态对比](ecosystem.md) 记录 modelhub 的范围与未集成事实。2026-10-19
   复核两仓库公开 HEAD，仍为此前记录的快照；这不构成全生态功能缺失证明。
 - 演示只覆盖有限的 PUT/GET/OPTIONS 测试端点；没有商业服务器兼容性、性能
-  优势、签名体系或生态唯一性的声明。参考签名和浏览器存储适配仍属规划。
+  优势或生态唯一性的声明。另见已实现的[签名发布与版本接受流程](signed-releases.md)；
+  自动公钥分发/轮换和浏览器存储适配仍属规划。
 - [区块参考契约](block-reference.md)、[WebDAV 边界](webdav.md)、
   [验证记录](validation.md) 与生成接口是具体能力的核验入口。

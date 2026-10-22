@@ -84,6 +84,10 @@ No additional upstream code/test suite or cryptographic signature code was copie
   APIs; no external recovery command or test suite was copied.
 
 Dependencies retain copyright/license notices in their own distribution.
+- The signed-update host/CLI integration and its local HTTP/actual-process tests
+  are project-authored Apache-2.0. The demonstration reuses the existing public-domain
+  USGS fixture and explicitly synthetic derived v2. Existing published crypto,
+  HTTP and filesystem dependencies are called without copied implementation/tests.
 - The release-state schema, monotonic acceptance/locking/recovery workflow and
   its tests are project-authored Apache-2.0, using existing async filesystem
   primitives. TUF's public specification informed rollback/freeze threat

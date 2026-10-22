@@ -12,6 +12,7 @@ import {
 
 import {
   "moonbitlang/async/socket",
+  "moonbitlang/async/io",
   "hustcer/ed25519",
 } for "test"
 

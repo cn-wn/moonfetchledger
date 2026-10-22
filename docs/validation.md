@@ -1,5 +1,21 @@
 # Validation record — 2026-10-22
 
+The signed update workflow adds three native integration tests (118 native total):
+signature/control/state-alias refusal before mutation followed by offline delivery
+and reopen; bounded key/announcement loading and no-replace signing; actual HTTP
+redirect/encoding/range/declared and streamed size boundaries plus recovery.
+The HTTP fixture tolerates EOF before a request (an explicitly abandoned socket),
+checks the exact received request sequence, and checks specific rejection reasons.
+Declared-overflow headers are flushed before intentionally closing their body.
+This guards against a ReaderClosed observed during a full-suite rerun without
+weakening the client's rejection checks; that one failure's exact origin was not
+established. The final native and CLI/server verification is repeated after this fix.
+`scripts/signed_update_demo.mbtx` additionally exercises real CLI publisher,
+signer, initializer and consumer processes, signature/expiry/metadata tampering,
+signed rollback, saved pause/resume, exact USGS-derived delivery and stopped-origin
+reopen. The release-state milestone passed all three-system runtime and real-server CI:
+https://github.com/cn-wn/moonfetchledger/actions/runs/39722553467 .
+
 Four additional native release-state tests (115 native total) cover reopen,
 rollback/equivocation/backward clocks, generic callback results, action failure
 retaining the accepted floor, exclusive locking throughout the callback, policy
@@ -279,8 +295,9 @@ pinned metadata, reuse 11655 of 23943 v2 bytes, save a one-block pause, re-audit
 later damage, refuse changed ETag before content writes, resume and export exact
 v2; stopped-origin complete reopen requires no artifact request. The optional
 actual WsgiDAV scenario checks the same cross-version reconstruction through the
-published client and immutable v1 preservation. Signatures and trust-anchor
-distribution remain unimplemented; these checks do not certify all review gaps.
+published client and immutable v1 preservation. The later signed-release milestone
+adds publisher signatures and persistent version acceptance; automatic trust-anchor
+distribution remains unimplemented. These checks do not certify all review gaps.
 
 Reproduce in a shell with moon, node and the platform C compiler on PATH:
 

@@ -170,6 +170,21 @@ test "tamper malformed unknown and noncanonical fields fail without poisoning la
 
 ///|
 test "descriptor boundaries require exact key sizes monotonic numbers identifiers URL and hex" {
+  let oversized = @release.Release::new(
+    "p",
+    "c",
+    1L,
+    0L,
+    1L,
+    "https://e.test/" + "\"".repeat(8000),
+    @ledger.digest(b""),
+  )
+  try oversized.sign(seed()) catch {
+    @release.InvalidRelease(_) => ()
+    _ => fail("wrong encoded publication bound error")
+  } noraise {
+    _ => fail("published a descriptor larger than the verification bound")
+  }
   for
     (version, issued, expires) in [
       (0L, 1L, 2L),

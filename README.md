@@ -4,6 +4,9 @@ Portable [signed release authorization](docs/signed-releases.md) binds an
 independently pinned publisher key, product/channel, version and expiry to the
 exact delta metadata. It reuses the published MoonBit Ed25519 package; it is
 neither a new crypto implementation nor TUF-compatible metadata.
+The native signed-update CLI combines remote signed announcements, persistent
+version acceptance, cross-version reuse, pause/resume and verified delivery:
+`moon run scripts/signed_update_demo.mbtx` reproduces the complete public-data workflow.
 
 `cn-wn/moonfetchledger` is a MoonBit cross-version file update and integrity
 recovery layer for existing download clients. Its [delta workflow](docs/delta-update.md)
