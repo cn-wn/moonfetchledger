@@ -84,6 +84,11 @@ No additional upstream code/test suite or cryptographic signature code was copie
   APIs; no external recovery command or test suite was copied.
 
 Dependencies retain copyright/license notices in their own distribution.
+- The release-state schema, monotonic acceptance/locking/recovery workflow and
+  its tests are project-authored Apache-2.0, using existing async filesystem
+  primitives. TUF's public specification informed rollback/freeze threat
+  terminology (https://github.com/theupdateframework/specification/blob/master/tuf-spec.md);
+  no TUF code, data schema or test cases were copied and compatibility is not claimed.
 - `hustcer/ed25519@0.6.1`, Apache-2.0:
   https://github.com/hustcer/mbt-ed25519 and
   https://mooncakes.io/docs/hustcer/ed25519%400.6.1 . Used unmodified for plain

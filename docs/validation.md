@@ -1,5 +1,18 @@
 # Validation record — 2026-10-22
 
+Four additional native release-state tests (115 native total) cover reopen,
+rollback/equivocation/backward clocks, generic callback results, action failure
+retaining the accepted floor, exclusive locking throughout the callback, policy
+binding, missing/corrupt/oversized state refusal, monotonic pending-save recovery
+and preservation of rejected candidates. The initial signed-release commit's
+three-system runtime and real WsgiDAV CI all passed:
+https://github.com/cn-wn/moonfetchledger/actions/runs/39721816912 .
+An actual native rerun exposed a close race in the pre-existing authentication
+test server: after the client rejected 401/302 headers or consumed a complete
+range, the server could write a chunked-body terminator to a closed connection.
+The fixture responses now declare their actual Content-Length (zero for the
+empty errors); the receiver's rejection behavior is unchanged.
+
 The signed-release milestone adds four portable black-box tests (44 portable /
 111 native total). They cover deterministic serialization/signing and checked
 round trips, wrong publisher/product/channel/version, inclusive issuance and

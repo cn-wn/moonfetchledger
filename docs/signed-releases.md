@@ -52,8 +52,43 @@ The upstream cryptography package is unaudited and not constant-time; this layer
 does not upgrade those properties. It is unsuitable for side-channel-sensitive
 signing without an appropriate external signing environment.
 
-At this milestone signature verification has a configured minimum version but
-no persistent highest-version memory. Signed old versions inside their validity
-window can still replay unless the application remembers a version floor.
 Automatic key distribution/rotation, delegation, threshold signatures and
 compromised-key recovery are outside the implemented scope.
+
+## Persistent release acceptance (native)
+
+Run `moon run --target native examples/release-state` for signed authorization,
+real USGS data delivery without artifact network requests, and a reopened-store
+rollback refusal. The deterministic signing seed is public demonstration data.
+
+Initialize ONCE in a protected local directory with
+`host.initialize_release_state(path, trust)`. Initialization requires new state,
+`.lock` and `.next` paths; ordinary updates never initialize missing state.
+Call `host.with_release_state(path, trust, signed_bytes, now, action=...)` to
+verify the release, lock the store exclusively, and save its version, payload
+hash and observed clock BEFORE invoking the action. The callback gets the
+`ApprovedRelease` and may return any value. Keep all update work inside it.
+
+Reopening rejects lower versions, a different payload at the same version,
+backward clocks, policy/key changes, malformed or missing state. Identical
+releases may retry or resume while still valid. Callback failure keeps the
+accepted version floor; accepting a release means authorizing it, not marking
+its installation successful. Increase the version to refresh signed expiry.
+The configured minimum version is also frozen in this store.
+
+MFLRELEASE-STATE1 is bounded canonical UTF-8 JSON (4096 bytes maximum), exactly
+`[tag, product, channel, keySha256, minimumVersion, acceptedVersion, payloadSha256,
+observedUnixTime]`. Numbers are decimal strings. Initial accepted version/time
+are `"0"` and the initial payload hash is empty. Nonzero versions require a
+SHA-256 payload hash. Persistence writes a new `.next`, syncs and reads it back,
+then replaces state. Interrupted pending data blocks ordinary actions.
+`host.recover_release_state(path, trust)` explicitly validates BOTH records and
+promotes pending state only if version/time do not decrease and same-version
+payload does not change. Invalid candidates are preserved for inspection.
+
+Protect the state, lock and pending files from deletion, replacement and rollback
+by other software. The callback must not modify those paths. Locks coordinate
+cooperating processes only. Restoring an older backup or deleting and explicitly
+reinitializing state defeats this local rollback defense. There is no trusted
+hardware counter, clock service or power-loss/directory-fsync durability claim.
+This is a single-key/product/channel store, not a general TUF trust database.

@@ -1,5 +1,7 @@
 import {
   "cn-wn/moonfetchledger" @ledger,
+  "cn-wn/moonfetchledger/release",
+  "moonbitlang/core/json",
   "moonbitlang/async",
   "moonbitlang/async/fs",
   "moonbitlang/async/http",
@@ -10,6 +12,7 @@ import {
 
 import {
   "moonbitlang/async/socket",
+  "hustcer/ed25519",
 } for "test"
 
 options(

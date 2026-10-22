@@ -117,11 +117,13 @@ async test "credential rotation retains coverage, 401 never retries and 302 neve
           conn.send_response(302, "Found", extra_headers={
             "Location": url + "/data",
             "Connection": "close",
+            "Content-Length": "0",
           })
         } else if request.headers.get("Authorization") !=
           Some("Bearer " + expected) {
           conn.send_response(401, "Unauthorized", extra_headers={
             "Connection": "close",
+            "Content-Length": "0",
           })
         } else {
           let bounds = request.headers.get("Range").unwrap()[6:]
@@ -133,6 +135,7 @@ async test "credential rotation retains coverage, 401 never retries and 302 neve
           conn.send_response(206, "Partial Content", extra_headers={
             "ETag": "\"v1\"",
             "Content-Range": "bytes \{start}-\{end - 1}/7",
+            "Content-Length": "\{end - start}",
             "Connection": "close",
           })
           conn.write(data[start:end].to_owned())

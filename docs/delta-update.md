@@ -128,7 +128,8 @@ the published upstream WebDAV client.
 
 [Signed release authorization](signed-releases.md) can now authenticate the pin
 using an independently provisioned publisher key, product/channel and validity
-policy. Persistent anti-rollback, automatic trust-anchor distribution/rotation,
+policy. Native persistent release acceptance rejects lower versions, backward
+clocks and same-version payload changes across restarts. Automatic trust-anchor distribution/rotation,
 shared chunk caching and installed-file replacement remain unimplemented.
 
 ## Sources

@@ -52,6 +52,7 @@ async fn main {
   checked(["run", "--target", "wasm", "examples/assemble"])
   checked(["run", "--target", "wasm", "examples/release"])
   checked(["run", "--target", "native", "examples/release"])
+  checked(["run", "--target", "native", "examples/release-state"])
   checked(["run", "--target", "native", "examples/assemble"])
   checked(["run", "scripts/recovery_demo.mbtx"])
   checked(["run", "scripts/local_storage_demo.mbtx"])
