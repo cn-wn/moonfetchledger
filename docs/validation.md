@@ -1,5 +1,12 @@
 # Validation record — 2026-10-22
 
+Candidate-work admission adds two portable tests and two native tests: 49
+portable / 130 native total. They cover atomic two-window admission, explicit
+partial progress, exact suffix replay, failed weak-collision hashing charges,
+read segmentation invariance, cumulative pool limits, refusal before sidecars
+and retry with increased limits. Existing preview JSON is unchanged. The pool
+CLI demo exercises the new controls with the public USGS fixture.
+
 Signed private-artifact support adds two native tests (126 native total): exact
 resource binding before staging, zero-fetch reuse without secret persistence,
 and actual HTTP pause/401/no-retry/credential rotation/resume/export. The signed

@@ -67,3 +67,42 @@ The self-contained CLI demo combines two incomplete USGS-derived files into the
 exact 28008-byte target without artifact requests, preserves both sources and
 checks read-only planning and control-error preservation. This is a regular-file
 client extension, not zsync-format compatibility or a shared chunk cache.
+
+## Bounded scanning work
+
+Native previews, `reuse_from_seed(s)` and `update_from_seed(s)` accept optional
+`max_scan_bytes` and `max_hash_bytes`, both nonnegative Int64. The first admits
+the total size of ALL seeds before scanning; the second caps candidate SHA-256
+input bytes across ALL seeds and read chunks. Failed weak-checksum candidates
+are charged too. A pool never resets these limits for each file. Source growth
+is refused and bounded positional reads do not consume appended data.
+
+```text
+moon run --target native cmd/update -- --preview --metadata v2.delta --metadata-sha256 TRUSTED_PIN --seed v0.bin --seed v1.bin --max-scan-bytes 100000000 --max-hash-bytes 200000000
+```
+
+Budget exhaustion raises a diagnostic before output/checkpoint/lock creation.
+Inputs are preserved; explicitly increase the budget and retry. There is no
+silent full-download fallback. Zero hash budget may scan inputs with no weak
+hits but refuses a required candidate hash. Bounds apply to seed scanning only:
+copy readback, final target verification, metadata, network traffic and wall time
+are not charged. Existing target/chunk/index memory limits still apply. Omission
+preserves the prior unbounded-work behavior. Resume does not scan seeds, so
+supplying scan controls on resume is refused rather than ignored. The signed
+CLI currently exposes credential controls but not these scan-limit options;
+compose the lower-level guarded workflow if both are required.
+
+Portable `SeedScanner.push_bounded(bytes, max_hash_bytes=N)` returns `ScanStep`
+with consumed_bytes, hashed_bytes and blocked. This is a budget per CALL. When
+blocked, neither rolling window consumes the blocked byte; replay exactly
+`bytes[consumed_bytes:]` after granting enough budget for both windows. No match
+is silently dropped. `finish()` can explicitly finalize the scanned prefix,
+after which no further input is accepted. Negative budgets fail without mutation.
+`SeedPlan.hashed_bytes` and `SeedPoolPlan.hashed_bytes` expose cumulative candidate
+work. MFLPLAN1/MFLPOOL1 JSON bytes remain unchanged for existing consumers.
+
+Tests cover a byte hitting both window sizes simultaneously, zero/negative/exact
+budgets, repeated deliberate weak collisions, arbitrary read boundaries, exact
+suffix recovery, shared pool budgets and failure-before-staging followed by a
+larger-budget retry. The multi-seed CLI demo checks both limit failures, then
+performs verified delivery under explicit limits.

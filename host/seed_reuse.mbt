@@ -94,6 +94,8 @@ pub async fn reuse_from_seed(
   reference : @ledger.DeltaReference,
   seed : String,
   output : String,
+  max_scan_bytes? : Int64,
+  max_hash_bytes? : Int64,
 ) -> SeedReuseReport {
-  reuse_from_seeds(reference, [seed], output)
+  reuse_from_seeds(reference, [seed], output, max_scan_bytes?, max_hash_bytes?)
 }

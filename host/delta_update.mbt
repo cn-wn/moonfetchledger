@@ -221,7 +221,15 @@ pub async fn update_from_seed(
   max_attempts~ : Int32 = 1,
   request_timeout_ms~ : Int32 = 30000,
   auth? : BearerAuth,
+  max_scan_bytes? : Int64,
+  max_hash_bytes? : Int64,
 ) -> DeltaUpdateReport {
+  check_scan_limits(max_scan_bytes?, max_hash_bytes?)
+  if resuming && (max_scan_bytes is Some(_) || max_hash_bytes is Some(_)) {
+    raise InvalidInput(
+      "scan limits apply only to initial seed reuse; omit them on resume",
+    )
+  }
   check_delta_update(
     reference,
     output,
@@ -235,7 +243,16 @@ pub async fn update_from_seed(
     auth?,
   )
   let staged = match seed {
-    Some(path) => Some(reuse_from_seed(reference, path, output))
+    Some(path) =>
+      Some(
+        reuse_from_seed(
+          reference,
+          path,
+          output,
+          max_scan_bytes?,
+          max_hash_bytes?,
+        ),
+      )
     None => None
   }
   finish_delta_update(
@@ -295,7 +312,10 @@ pub async fn update_from_seeds(
   max_attempts~ : Int32 = 1,
   request_timeout_ms~ : Int32 = 30000,
   auth? : BearerAuth,
+  max_scan_bytes? : Int64,
+  max_hash_bytes? : Int64,
 ) -> DeltaUpdateReport {
+  check_scan_limits(max_scan_bytes?, max_hash_bytes?)
   if seeds.is_empty() || seeds.length() > 32 {
     raise InvalidInput("update requires 1..32 seeds")
   }
@@ -310,7 +330,13 @@ pub async fn update_from_seeds(
     request_timeout_ms~,
     auth?,
   )
-  let staged = reuse_from_seeds(reference, seeds, output)
+  let staged = reuse_from_seeds(
+    reference,
+    seeds,
+    output,
+    max_scan_bytes?,
+    max_hash_bytes?,
+  )
   finish_delta_update(
     reference,
     output,

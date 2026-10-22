@@ -50,6 +50,9 @@ async fn run() -> Unit {
       println(
         "Use --preview with metadata/pin and --seed only for a read-only report. Repeat --seed for up to 32 ordered files (MFLPOOL1). Resume updates with --resume and no seeds. Pins require independent trust; cmd/release provides signed updates. Installed-file replacement is not implemented.",
       )
+      println(
+        "Initial scans accept --max-scan-bytes N and --max-hash-bytes N. These bound seed input and candidate SHA work, not network billing. Omit scan limits on resume.",
+      )
       return
     }
     if flag == "--publish" {
@@ -85,6 +88,7 @@ async fn run() -> Unit {
         "--source", "--metadata", "--metadata-url", "--metadata-sha256", "--url",
         "--length", "--etag", "--sha256", "--chunk-size", "--seed", "--output", "--export-to",
         "--parallel", "--stop-after-blocks", "--max-attempts", "--request-timeout-ms",
+        "--max-scan-bytes", "--max-hash-bytes",
       ].contains(flag) ||
       i + 1 >= args.length() ||
       values.contains(flag) {
@@ -143,6 +147,7 @@ async fn run() -> Unit {
     for name in values.keys() {
       if ![
           "--metadata", "--metadata-url", "--metadata-sha256", "--seed", "--request-timeout-ms",
+          "--max-scan-bytes", "--max-hash-bytes",
         ].contains(name) {
         fail("unsupported preview option: \{name}")
       }
@@ -153,6 +158,15 @@ async fn run() -> Unit {
   }
   let output = if previewing { "" } else { required(values, "--output") }
   let pin = required(values, "--metadata-sha256")
+  let max_scan_bytes = values
+    .get("--max-scan-bytes")
+    .map(n => integer(n, "--max-scan-bytes"))
+  let max_hash_bytes = values
+    .get("--max-hash-bytes")
+    .map(n => integer(n, "--max-hash-bytes"))
+  if resuming && (max_scan_bytes is Some(_) || max_hash_bytes is Some(_)) {
+    fail("scan limits are only for initial seed scans; omit them on resume")
+  }
   let timeout = small(values, "--request-timeout-ms", 30000)
   let parallel = small(values, "--parallel", 4)
   let attempts = small(values, "--max-attempts", 1)
@@ -185,9 +199,18 @@ async fn run() -> Unit {
   if previewing {
     println(
       if seeds.length() == 1 {
-        @host.preview_seed(reference, seeds[0]).to_json().stringify()
+        @host.preview_seed(
+          reference,
+          seeds[0],
+          max_scan_bytes?,
+          max_hash_bytes?,
+        )
+        .to_json()
+        .stringify()
       } else {
-        @host.preview_seeds(reference, seeds).to_json().stringify()
+        @host.preview_seeds(reference, seeds, max_scan_bytes?, max_hash_bytes?)
+        .to_json()
+        .stringify()
       },
     )
     return
@@ -202,6 +225,8 @@ async fn run() -> Unit {
       stop_after_blocks?=budget,
       max_attempts=attempts,
       request_timeout_ms=timeout,
+      max_scan_bytes?,
+      max_hash_bytes?,
     )
   } else {
     @host.update_from_seed(
@@ -214,6 +239,8 @@ async fn run() -> Unit {
       stop_after_blocks?=budget,
       max_attempts=attempts,
       request_timeout_ms=timeout,
+      max_scan_bytes?,
+      max_hash_bytes?,
     )
   }
   if report.seed is Some(seed) {

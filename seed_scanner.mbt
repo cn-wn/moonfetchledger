@@ -16,6 +16,7 @@ pub extend SeedMatch with Debug::{to_repr}
 pub struct SeedPlan {
   scanned_bytes : Int64
   reused_bytes : Int64
+  hashed_bytes : Int64
   priv spec : ObjectSpec
   priv chunk_size : Int32
   priv records : Array[SeedMatch]
@@ -47,6 +48,7 @@ pub struct SeedScanner {
   priv windows : Array[SeedWindow]
   priv offsets : Array[Int64?]
   priv mut position : Int64
+  priv mut hashed : Int64
   priv mut closed : Bool
 }
 
@@ -91,6 +93,7 @@ pub fn DeltaReference::scanner(self : DeltaReference) -> SeedScanner {
     windows,
     offsets: Array::make(self.strong.length(), None),
     position: 0L,
+    hashed: 0L,
     closed: false,
   }
 }
@@ -100,11 +103,71 @@ pub fn SeedScanner::push(
   self : SeedScanner,
   bytes : Bytes,
 ) -> Unit raise LedgerError {
-  if self.closed ||
-    self.position > 9223372036854775807L - bytes.length().to_int64() {
-    raise InvalidSpec("seed scanner is finished or seed position exceeds Int64")
+  let step = self.push_bounded(bytes, max_hash_bytes=9223372036854775807L)
+  if step.blocked {
+    raise InvalidSpec("seed chunk hashing work exceeds Int64")
   }
-  for byte in bytes {
+}
+
+///|
+pub struct ScanStep {
+  consumed_bytes : Int32
+  hashed_bytes : Int64
+  blocked : Bool
+}
+
+///|
+// Compute the next weak-hit cost without changing either rolling window. Both
+// windows must fit before consuming a byte, so the caller can replay its suffix.
+fn SeedWindow::next_hash_cost(self : SeedWindow, byte : Byte) -> Int64 {
+  if self.buckets.is_empty() || self.count < self.width - 1 {
+    return 0L
+  }
+  let incoming = byte.to_int().reinterpret_as_uint()
+  let (a, b) = if self.count < self.width {
+    let a = (self.a + incoming) & 65535U
+    (a, (self.b + a) & 65535U)
+  } else {
+    let outgoing = self.ring[self.head].to_int().reinterpret_as_uint()
+    let a = (self.a - outgoing + incoming) & 65535U
+    (a, (self.b - self.width.reinterpret_as_uint() * outgoing + a) & 65535U)
+  }
+  if self.buckets.contains((b << 16) | a) {
+    self.width.to_int64()
+  } else {
+    0L
+  }
+}
+
+///|
+/// Consume the longest prefix whose candidate SHA-256 input fits this CALL's
+/// budget. When blocked, replay bytes[consumed_bytes:] with a larger budget.
+/// Budget exhaustion is explicit and does not consume the blocked byte in any
+/// window. Rolling byte scanning itself is not charged as SHA work.
+pub fn SeedScanner::push_bounded(
+  self : SeedScanner,
+  bytes : Bytes,
+  max_hash_bytes~ : Int64,
+) -> ScanStep raise LedgerError {
+  if self.closed ||
+    max_hash_bytes < 0L ||
+    self.position > 9223372036854775807L - bytes.length().to_int64() {
+    raise InvalidSpec(
+      "seed scanner requires open state, nonnegative hash budget and bounded Int64 position",
+    )
+  }
+  let mut hashed = 0L
+  for index in 0..<bytes.length() {
+    let byte = bytes[index]
+    let cost = self.windows.fold(init=0L, (n, w) => n + w.next_hash_cost(byte))
+    if cost > max_hash_bytes - hashed {
+      return { consumed_bytes: index, hashed_bytes: hashed, blocked: true, }
+    }
+    if self.hashed > 9223372036854775807L - cost {
+      raise InvalidSpec("seed hashing counter exceeds Int64")
+    }
+    hashed += cost
+    self.hashed += cost
     self.position += 1L
     for window in self.windows {
       if window.buckets.is_empty() {
@@ -149,6 +212,7 @@ pub fn SeedScanner::push(
       }
     }
   }
+  { consumed_bytes: bytes.length(), hashed_bytes: hashed, blocked: false, }
 }
 
 ///|
@@ -173,6 +237,7 @@ pub fn SeedScanner::finish(self : SeedScanner) -> SeedPlan {
   {
     scanned_bytes: self.position,
     reused_bytes: reused,
+    hashed_bytes: self.hashed,
     spec: self.reference.spec,
     chunk_size: self.reference.chunk_size,
     records,

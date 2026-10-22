@@ -18,6 +18,7 @@ pub struct SeedPool {
   priv selected : Array[SeedSourceMatch?]
   priv counts : Array[Int64]
   priv mut scanned : Int64
+  priv mut hashed : Int64
   priv mut closed : Bool
 }
 
@@ -28,6 +29,7 @@ pub fn SeedPool::new(reference : DeltaReference) -> SeedPool {
     selected: Array::make(reference.strong.length(), None),
     counts: [],
     scanned: 0L,
+    hashed: 0L,
     closed: false,
   }
 }
@@ -42,7 +44,8 @@ pub fn SeedPool::add(
     self.counts.length() >= 32 ||
     plan.spec != self.reference.spec ||
     plan.chunk_size != self.reference.chunk_size ||
-    self.scanned > 9223372036854775807L - plan.scanned_bytes {
+    self.scanned > 9223372036854775807L - plan.scanned_bytes ||
+    self.hashed > 9223372036854775807L - plan.hashed_bytes {
     raise InvalidSpec(
       "seed pool requires open state, at most 32 seeds, identical target/layout and bounded scanned bytes",
     )
@@ -62,12 +65,14 @@ pub fn SeedPool::add(
   }
   self.counts.push(bytes)
   self.scanned += plan.scanned_bytes
+  self.hashed += plan.hashed_bytes
 }
 
 ///|
 pub struct SeedPoolPlan {
   scanned_bytes : Int64
   reused_bytes : Int64
+  hashed_bytes : Int64
   priv spec : ObjectSpec
   priv records : Array[SeedSourceMatch]
   priv counts : Array[Int64]
@@ -88,6 +93,7 @@ pub fn SeedPool::finish(self : SeedPool) -> SeedPoolPlan raise LedgerError {
   }
   {
     scanned_bytes: self.scanned,
+    hashed_bytes: self.hashed,
     reused_bytes: self.counts.fold(init=0L, (n, v) => n + v),
     spec: self.reference.spec,
     records,

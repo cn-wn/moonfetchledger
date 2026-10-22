@@ -84,6 +84,9 @@ No additional upstream code/test suite or cryptographic signature code was copie
   APIs; no external recovery command or test suite was copied.
 
 Dependencies retain copyright/license notices in their own distribution.
+- Bounded candidate-hashing admission, explicit suffix-resume semantics and
+  collision/partition/preservation tests are project-authored Apache-2.0. No
+  external budget-control implementation or test corpus was copied.
 - Signed private-artifact integration reuses existing BearerAuth/HTTP code.
   Environment-only CLI credentials, destination binding and rotation tests are
   project-authored Apache-2.0; all demonstration tokens are public test data.

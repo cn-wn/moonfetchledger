@@ -75,6 +75,20 @@ async fn main {
   assert_eq(@fs.readdir(dir), before)
   let args = base.copy()
   args.append(["--output", dir + "/staging", "--export-to", dir + "/ready"])
+  let too_small = args.copy()
+  too_small.append(["--max-hash-bytes", "0"])
+  assert_true(invoke(too_small).exit_code() != 0)
+  assert_true(!@fs.exists(dir + "/staging.mfl.lock"))
+  let scan_too_small = args.copy()
+  scan_too_small.append(["--max-scan-bytes", "0"])
+  assert_true(invoke(scan_too_small).exit_code() != 0)
+  assert_true(!@fs.exists(dir + "/staging.mfl.lock"))
+  args.append([
+    "--max-scan-bytes",
+    (a.length() + b.length()).to_string(),
+    "--max-hash-bytes",
+    "10000000",
+  ])
   let bad = args.copy()
   bad.append(["--parallel", "0"])
   assert_true(invoke(bad).exit_code() != 0)

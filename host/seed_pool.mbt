@@ -44,12 +44,34 @@ async fn[T] with_seed_files(
 async fn scan_seed_pool(
   reference : @ledger.DeltaReference,
   files : Array[@fs.File],
+  max_scan_bytes? : Int64,
+  max_hash_bytes? : Int64,
 ) -> @ledger.SeedPoolPlan {
+  check_scan_limits(max_scan_bytes?, max_hash_bytes?)
   let pool = @ledger.SeedPool::new(reference)
   let sizes : Array[Int64] = []
+  let mut total = 0L
   for file in files {
-    sizes.push(file.size())
-    pool.add(scan_seed_file(reference, file))
+    let size = file.size()
+    if total > 9223372036854775807L - size {
+      raise InvalidInput("total seed bytes exceed Int64")
+    }
+    total += size
+    sizes.push(size)
+  }
+  if max_scan_bytes is Some(limit) && total > limit {
+    raise InvalidInput("seed pool exceeds total scan byte limit; retain inputs")
+  }
+  let mut hashed = 0L
+  for i, file in files {
+    let plan = scan_seed_file(
+      reference,
+      file,
+      max_scan_bytes=sizes[i],
+      max_hash_bytes?=max_hash_bytes.map(n => n - hashed),
+    )
+    pool.add(plan)
+    hashed += plan.hashed_bytes
   }
   for i, file in files {
     if file.size() != sizes[i] {
@@ -64,8 +86,13 @@ async fn scan_seed_pool(
 pub async fn preview_seeds(
   reference : @ledger.DeltaReference,
   seeds : Array[String],
+  max_scan_bytes? : Int64,
+  max_hash_bytes? : Int64,
 ) -> @ledger.SeedPoolPlan {
-  with_seed_files(seeds, files => scan_seed_pool(reference, files))
+  check_scan_limits(max_scan_bytes?, max_hash_bytes?)
+  with_seed_files(seeds, files => {
+    scan_seed_pool(reference, files, max_scan_bytes?, max_hash_bytes?)
+  })
 }
 
 ///|
@@ -77,7 +104,10 @@ pub async fn reuse_from_seeds(
   reference : @ledger.DeltaReference,
   seeds : Array[String],
   output : String,
+  max_scan_bytes? : Int64,
+  max_hash_bytes? : Int64,
 ) -> SeedReuseReport {
+  check_scan_limits(max_scan_bytes?, max_hash_bytes?)
   if output.is_empty() {
     raise InvalidInput("seed pool output is required")
   }
@@ -102,7 +132,12 @@ pub async fn reuse_from_seeds(
     for file in files {
       sizes.push(file.size())
     }
-    let plan = scan_seed_pool(reference, files)
+    let plan = scan_seed_pool(
+      reference,
+      files,
+      max_scan_bytes?,
+      max_hash_bytes?,
+    )
     let lock = @fs.open(
       output + ".mfl.lock",
       mode=ReadWrite,
