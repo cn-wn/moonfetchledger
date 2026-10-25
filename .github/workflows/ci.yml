@@ -38,7 +38,7 @@ jobs:
         run: moon update
       - name: Verify (Unix)
         if: runner.os != 'Windows'
-        run: moon run scripts/verify.mbtx
+        run: moon run --deny-warn scripts/verify.mbtx
       - name: Verify (Windows)
         if: runner.os == 'Windows'
         shell: cmd
@@ -46,7 +46,7 @@ jobs:
           MOON_CC: cl
         run: |
           call "C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          moon run scripts/verify.mbtx
+          moon run --deny-warn scripts/verify.mbtx
   webdav-interop:
     timeout-minutes: 10
     runs-on: ubuntu-latest

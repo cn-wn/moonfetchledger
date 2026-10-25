@@ -1,14 +1,21 @@
-///|
+----
 import {
   "moonbitlang/async@0.22.4",
   "moonbitlang/async@0.22.4/fs",
   "moonbitlang/async@0.22.4/shell",
 }
+----
 
 ///|
 async fn checked(args : Array[String]) -> Unit {
-  println("verify: \{Repr(args)}")
-  @shell.Cmd("moon", args).run(timeout_ms=180000)
+  let effective = if args.length() == 2 && args[0] == "run" &&
+    args[1].has_suffix(".mbtx") {
+    ["run", "--deny-warn", args[1]]
+  } else {
+    args
+  }
+  println("verify: \{Repr(effective)}")
+  @shell.Cmd("moon", effective).run(timeout_ms=180000)
 }
 
 ///|
