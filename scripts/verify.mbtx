@@ -1,4 +1,6 @@
 ----
+
+///|
 import {
   "moonbitlang/async@0.22.4",
   "moonbitlang/async@0.22.4/fs",
@@ -8,7 +10,8 @@ import {
 
 ///|
 async fn checked(args : Array[String]) -> Unit {
-  let effective = if args.length() == 2 && args[0] == "run" &&
+  let effective = if args.length() == 2 &&
+    args[0] == "run" &&
     args[1].has_suffix(".mbtx") {
     ["run", "--deny-warn", args[1]]
   } else {
@@ -44,6 +47,7 @@ async fn main {
     "scripts/auth_demo.mbtx", "scripts/manifest_demo.mbtx", "scripts/checkpoint_recovery_demo.mbtx",
     "scripts/reference_demo.mbtx", "scripts/reference_recovery_demo.mbtx", "scripts/wsgidav_demo.mbtx",
     "scripts/delta_update_demo.mbtx", "scripts/signed_update_demo.mbtx", "scripts/seed_pool_demo.mbtx",
+    "scripts/downstream_demo.mbtx", "integration/downstream/main.mbt",
   ])
   checked(["info"])
   checked(["info", "--target", "native"])
@@ -75,6 +79,7 @@ async fn main {
   checked(["run", "scripts/delta_update_demo.mbtx"])
   checked(["run", "scripts/signed_update_demo.mbtx"])
   checked(["run", "scripts/seed_pool_demo.mbtx"])
+  checked(["run", "scripts/downstream_demo.mbtx"])
   println(
     "verified formatting, interfaces, four core targets, real-data assembly and HTTP/disk recovery",
   )

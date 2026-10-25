@@ -1,0 +1,76 @@
+----
+
+///|
+import {
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/core/json",
+}
+----
+
+///|
+async fn copy_cache(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination)
+  for name in @fs.readdir(source) {
+    let from = source + "/" + name
+    let to = destination + "/" + name
+    match @fs.kind(from) {
+      Directory => copy_cache(from, to)
+      Regular => @fs.write_file(to, @fs.read_file(from).binary())
+      _ => fail("unsupported dependency cache entry; no files silently skipped")
+    }
+  }
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let dir = @fs.tmpdir(prefix="mfl-downstream-workspace-")
+  defer @fs.rmdir(dir, recursive=true)
+  let consumer = dir + "/consumer"
+  @fs.mkdir(consumer)
+  for name in ["moon.mod", "moon.pkg", "main.mbt"] {
+    @fs.write_file(
+      consumer + "/" + name,
+      @fs.read_file("integration/downstream/" + name).binary(),
+    )
+  }
+  @fs.write_file(
+    dir + "/moon.work",
+    "members = [" + Json::string(root).stringify() + ", \"./consumer\"]\n",
+  )
+  let environment = { "MOON_WORK": dir + "/moon.work" }
+  copy_cache(root + "/.mooncakes", dir + "/.mooncakes")
+  for
+    args in [
+      ["check", "--frozen", "--target", "native", "--deny-warn"],
+      [
+        "run",
+        "--frozen",
+        "--target",
+        "native",
+        "--deny-warn",
+        ".",
+        "--",
+        root + "/fixtures/earthquakes-2024-01-01.csv",
+      ],
+    ] {
+    @shell.Cmd("moon", args, cwd=consumer, env=environment, inherit_env=true).run(
+      timeout_ms=180000,
+    )
+  }
+  @fs.write_file(dir + "/too-small", b"short")
+  let invalid = @shell.Cmd(
+    "moon",
+    ["run", "--frozen", "--target", "native", ".", "--", dir + "/too-small"],
+    cwd=consumer,
+    env=environment,
+    inherit_env=true,
+  ).output(timeout_ms=180000)
+  assert_true(invalid.exit_code() != 0)
+  assert_eq(@fs.read_file(dir + "/too-small").binary(), b"short")
+  println(
+    "separate downstream module compiled and ran through a local workspace dependency; no registry publication or library source copied into application",
+  )
+}

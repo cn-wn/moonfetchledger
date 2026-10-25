@@ -84,6 +84,10 @@ No additional upstream code/test suite or cryptographic signature code was copie
   APIs; no external recovery command or test suite was copied.
 
 Dependencies retain copyright/license notices in their own distribution.
+- The independent resource-maintainer module and workspace driver are
+  project-authored Apache-2.0 and call only public library/dependency APIs.
+  Its default input reuses the public-domain USGS fixture; no external
+  application code or tests were copied. Signing seeds are public TEST data.
 - Signed multi-seed/budget orchestration and its preflight, retry and actual-CLI
   tests are project-authored Apache-2.0, reusing existing matching and signature
   APIs. No additional upstream code, fixtures or test suites were copied.
