@@ -89,8 +89,8 @@ copy readback, final target verification, metadata, network traffic and wall tim
 are not charged. Existing target/chunk/index memory limits still apply. Omission
 preserves the prior unbounded-work behavior. Resume does not scan seeds, so
 supplying scan controls on resume is refused rather than ignored. The signed
-CLI currently exposes credential controls but not these scan-limit options;
-compose the lower-level guarded workflow if both are required.
+update API and CLI also accept these limits and multiple seeds; see
+[signed release updates](signed-releases.md).
 
 Portable `SeedScanner.push_bounded(bytes, max_hash_bytes=N)` returns `ScanStep`
 with consumed_bytes, hashed_bytes and blocked. This is a budget per CALL. When

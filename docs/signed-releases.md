@@ -158,7 +158,25 @@ only the remaining two blocks, exact 23943-byte delivery, preserved old/key file
 stopped-origin zero-download reopen and explicit interrupted-state recovery.
 Public test keys are used only within its temporary directory.
 
-## Private artifacts with public signed metadata
+## Multiple old files and bounded scanning
+
+Initial `host.update_signed_release` accepts either the existing `seed=path` or
+`seeds=[path0, path1, ...]`, with 1..32 distinct ordered files. Supplying both is
+refused. The CLI accepts repeated `--seed` options. All sources are checked for
+aliases to protected release-state paths before accepting a version.
+
+Optional `max_scan_bytes` and `max_hash_bytes` (CLI `--max-scan-bytes` and
+`--max-hash-bytes`) apply to the total pool, with the same accounting described
+in [update previews](update-preview.md). Negative/conflicting controls fail
+before state changes; a valid release accepted before a later scan-budget error
+remains accepted. No staging is created on scan exhaustion: increase the budget
+and retry that release. Resume accepts neither seeds nor scan controls.
+
+`moon run scripts/signed_update_demo.mbtx` exercises two partial seeds, both
+budget failures, bounded retry, authenticated pause/credential rotation/resume
+and exact delivery. The old single-seed API remains covered by native tests.
+
+## Private artifact credential controls
 
 Pass an existing `BearerAuth` as `auth=...` to `host.update_signed_release`.
 It must be bound to the EXACT artifact URL in the authenticated delta index.

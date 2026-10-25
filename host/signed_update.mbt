@@ -122,6 +122,7 @@ pub async fn update_signed_release(
   now~ : Int64,
   metadata_file? : String,
   seed? : String,
+  seeds? : Array[String],
   resuming~ : Bool = false,
   export_to? : String,
   parallel~ : Int32 = 4,
@@ -129,7 +130,38 @@ pub async fn update_signed_release(
   max_attempts~ : Int32 = 1,
   request_timeout_ms~ : Int32 = 30000,
   auth? : BearerAuth,
+  max_scan_bytes? : Int64,
+  max_hash_bytes? : Int64,
 ) -> SignedUpdateReport {
+  check_scan_limits(max_scan_bytes?, max_hash_bytes?)
+  if seed is Some(_) && seeds is Some(_) {
+    raise InvalidInput("choose seed or seeds, never both")
+  }
+  let sources = match seed {
+    Some(path) => [path]
+    None => seeds.unwrap_or([]).copy()
+  }
+  if (
+      resuming &&
+      (
+        seed is Some(_) ||
+        seeds is Some(_) ||
+        max_scan_bytes is Some(_) ||
+        max_hash_bytes is Some(_)
+      )
+    ) ||
+    (!resuming && (sources.is_empty() || sources.length() > 32)) {
+    raise InvalidInput(
+      "initial signed update requires 1..32 seeds; resume accepts no seeds or scan limits",
+    )
+  }
+  let source_entries : Array[String] = []
+  for path in sources {
+    if path.is_empty() || source_entries.contains(canonical_entry(path)) {
+      raise InvalidInput("signed update seeds must be nonempty distinct paths")
+    }
+    source_entries.push(canonical_entry(path))
+  }
   let checked = trust.verify(signed_release, now)
   validate_delta_url(checked.release.metadata_url)
   if state.is_empty() ||
@@ -140,8 +172,7 @@ pub async fn update_signed_release(
     max_attempts > 8 ||
     request_timeout_ms < 1 ||
     request_timeout_ms > 120000 ||
-    (stop_after_blocks is Some(n) && n < 0) ||
-    resuming == (seed is Some(_)) {
+    (stop_after_blocks is Some(n) && n < 0) {
     raise InvalidInput(
       "signed update requires state/output, exactly seed or resume, and valid parallel/attempt/timeout/block limits",
     )
@@ -159,7 +190,7 @@ pub async fn update_signed_release(
     output + ".mfl.next",
     output + ".mfl.recovering",
   ]
-  if seed is Some(p) {
+  for p in sources {
     paths.push(p)
   }
   if metadata_file is Some(p) {
@@ -222,18 +253,33 @@ pub async fn update_signed_release(
           request_timeout_ms~,
         )
     }
-    let update = update_from_seed(
-      reference,
-      output,
-      seed?,
-      resuming~,
-      export_to?,
-      parallel~,
-      stop_after_blocks?,
-      max_attempts~,
-      request_timeout_ms~,
-      auth?,
-    )
+    let update = if resuming {
+      update_from_seed(
+        reference,
+        output,
+        resuming~,
+        export_to?,
+        parallel~,
+        stop_after_blocks?,
+        max_attempts~,
+        request_timeout_ms~,
+        auth?,
+      )
+    } else {
+      update_from_seeds(
+        reference,
+        sources,
+        output,
+        export_to?,
+        parallel~,
+        stop_after_blocks?,
+        max_attempts~,
+        request_timeout_ms~,
+        auth?,
+        max_scan_bytes?,
+        max_hash_bytes?,
+      )
+    }
     {
       version: approved.release.version,
       payload_sha256: approved.payload_sha256,

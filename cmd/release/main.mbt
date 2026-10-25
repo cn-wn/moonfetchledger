@@ -87,6 +87,7 @@ fn artifact_auth(
 async fn run() -> Unit {
   let args = @env.args()
   let values : Map[String, String] = Map([])
+  let seeds : Array[String] = []
   let mut mode = "update"
   let mut resuming = false
   let mut loopback_auth = false
@@ -103,7 +104,7 @@ async fn run() -> Unit {
         "release (--init-state | --recover-state) --public-key-file RAW32 --product ID --channel ID --state FILE [--minimum-version N]",
       )
       println(
-        "release (--release FILE | --release-url URL) --public-key-file RAW32 --product ID --channel ID --state FILE (--seed OLD | --resume) --output STAGING [--metadata LOCAL_DELTA] [--export-to NEW_READY] [--minimum-version N] [--parallel 1..16] [--stop-after-blocks N] [--max-attempts 1..8] [--request-timeout-ms 1..120000]",
+        "release (--release FILE | --release-url URL) --public-key-file RAW32 --product ID --channel ID --state FILE (--seed OLD [--seed ANOTHER] | --resume) --output STAGING [--metadata LOCAL_DELTA] [--export-to NEW_READY] [--minimum-version N] [--parallel 1..16] [--stop-after-blocks N] [--max-attempts 1..8] [--request-timeout-ms 1..120000] [--max-scan-bytes N] [--max-hash-bytes N]",
       )
       println(
         "Public keys require independent provisioning. Uses the system Unix clock; there is no clock override. Protect state and .lock/.next; never reset to bypass rollback errors. No key rotation or installed-file replacement.",
@@ -134,12 +135,20 @@ async fn run() -> Unit {
       loopback_auth = true
       continue i + 1
     }
+    if flag == "--seed" {
+      if i + 1 >= args.length() || seeds.length() >= 32 {
+        fail("--seed requires a path; at most 32 ordered files")
+      }
+      seeds.push(args[i + 1])
+      continue i + 2
+    }
     if ![
         "--private-seed-file", "--descriptor", "--product", "--channel", "--version",
         "--issued-at", "--expires-at", "--metadata-url", "--metadata-sha256", "--public-key-file",
         "--state", "--minimum-version", "--release", "--release-url", "--seed", "--output",
         "--metadata", "--export-to", "--parallel", "--stop-after-blocks", "--max-attempts",
-        "--request-timeout-ms", "--bearer-env", "--artifact-url",
+        "--request-timeout-ms", "--bearer-env", "--artifact-url", "--max-scan-bytes",
+        "--max-hash-bytes",
       ].contains(flag) ||
       i + 1 >= args.length() ||
       values.contains(flag) {
@@ -162,7 +171,7 @@ async fn run() -> Unit {
       "--public-key-file", "--product", "--channel", "--state", "--minimum-version",
       "--release", "--release-url", "--seed", "--output", "--metadata", "--export-to",
       "--parallel", "--stop-after-blocks", "--max-attempts", "--request-timeout-ms",
-      "--bearer-env", "--artifact-url",
+      "--bearer-env", "--artifact-url", "--max-scan-bytes", "--max-hash-bytes",
     ]
   }
   for key in values.keys() {
@@ -172,6 +181,9 @@ async fn run() -> Unit {
   }
   if resuming && mode != "update" {
     fail("--resume is only valid for updates")
+  }
+  if mode != "update" && !seeds.is_empty() {
+    fail("seeds are only valid for updates")
   }
   if loopback_auth && (mode != "update" || !values.contains("--bearer-env")) {
     fail("--allow-loopback-auth requires an update with --bearer-env")
@@ -210,6 +222,11 @@ async fn run() -> Unit {
   } else {
     None
   }
+  let max_scan_bytes = values.get("--max-scan-bytes").map(integer)
+  let max_hash_bytes = values.get("--max-hash-bytes").map(integer)
+  if resuming && (max_scan_bytes is Some(_) || max_hash_bytes is Some(_)) {
+    fail("scan limits are only for initial updates; omit them on resume")
+  }
   if timeout < 1 ||
     timeout > 120000 ||
     parallel < 1 ||
@@ -221,7 +238,7 @@ async fn run() -> Unit {
   if mode == "update" &&
     (
       values.contains("--release") == values.contains("--release-url") ||
-      resuming == values.contains("--seed")
+      resuming == !seeds.is_empty()
     ) {
     fail("choose exactly release or release-url, and seed or resume")
   }
@@ -258,7 +275,7 @@ async fn run() -> Unit {
     output,
     now=now(),
     metadata_file?=values.get("--metadata"),
-    seed?=values.get("--seed"),
+    seeds?=if resuming { None } else { Some(seeds) },
     resuming~,
     export_to?=values.get("--export-to"),
     parallel~,
@@ -266,6 +283,8 @@ async fn run() -> Unit {
     max_attempts=attempts,
     request_timeout_ms=timeout,
     auth?,
+    max_scan_bytes?,
+    max_hash_bytes?,
   )
   report(if result.update.receive.complete { "complete" } else { "paused" }, [
     result.version.to_string(),

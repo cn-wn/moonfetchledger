@@ -84,6 +84,9 @@ No additional upstream code/test suite or cryptographic signature code was copie
   APIs; no external recovery command or test suite was copied.
 
 Dependencies retain copyright/license notices in their own distribution.
+- Signed multi-seed/budget orchestration and its preflight, retry and actual-CLI
+  tests are project-authored Apache-2.0, reusing existing matching and signature
+  APIs. No additional upstream code, fixtures or test suites were copied.
 - Bounded candidate-hashing admission, explicit suffix-resume semantics and
   collision/partition/preservation tests are project-authored Apache-2.0. No
   external budget-control implementation or test corpus was copied.

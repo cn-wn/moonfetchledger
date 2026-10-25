@@ -70,6 +70,10 @@ async fn main {
   old.write_at(b"\x00", position=12000L)
   old.close()
   let preserved_seed = @fs.read_file(seed).binary()
+  let seed_a = dir + "/old-a"
+  let seed_b = dir + "/old-b"
+  @fs.write_file(seed_a, preserved_seed[:8192].to_owned())
+  @fs.write_file(seed_b, preserved_seed[8192:].to_owned())
   let requests : Array[Int32] = []
   let mut metadata_gets = 0
   let mut announcement_gets = 0
@@ -229,7 +233,9 @@ async fn main {
       ready,
     ])
     let new_args = remote.copy()
-    new_args.append(["--seed", seed, "--stop-after-blocks", "1"])
+    new_args.append([
+      "--seed", seed_a, "--seed", seed_b, "--stop-after-blocks", "1",
+    ])
     let before_bad_options = announcement_gets
     for
       invalid in [
@@ -243,6 +249,7 @@ async fn main {
       assert_true(invoke("release", args).exit_code() != 0)
     }
     assert_eq(announcement_gets, before_bad_options)
+    assert_eq(@fs.read_file(state).binary(), initial)
     announcement = @utf8.encode(
       @utf8.decode(v2_release).replace_all(old="earthquakes", new="tampered"),
     )
@@ -271,6 +278,18 @@ async fn main {
     assert_true(invoke("release", wrong_destination).exit_code() != 0)
     assert_true(!@fs.exists(output) && !@fs.exists(output + ".mfl.lock"))
     assert_eq(requests.length(), 0)
+    for limit in ["--max-scan-bytes", "--max-hash-bytes"] {
+      let bounded = new_args.copy()
+      bounded.append([limit, "0"])
+      assert_true(invoke("release", bounded).exit_code() != 0)
+      assert_true(!@fs.exists(output) && !@fs.exists(output + ".mfl.lock"))
+    }
+    new_args.append([
+      "--max-scan-bytes",
+      preserved_seed.length().to_string(),
+      "--max-hash-bytes",
+      "10000000",
+    ])
     let paused = first_record(invoke("release", new_args))
     assert_true(
       paused
@@ -323,6 +342,8 @@ async fn main {
     assert_eq(requests, [0, 8192, 12288])
     assert_eq(@fs.read_file(ready).binary(), v2)
     assert_eq(@fs.read_file(seed).binary(), preserved_seed)
+    assert_eq(@fs.read_file(seed_a).binary(), preserved_seed[:8192].to_owned())
+    assert_eq(@fs.read_file(seed_b).binary(), preserved_seed[8192:].to_owned())
     assert_eq(@fs.read_file(private_path).binary(), private_seed)
     assert_eq(@fs.read_file(public_path).binary(), public_key)
     assert_eq(@fs.read_file(metadata_path).binary(), metadata)
