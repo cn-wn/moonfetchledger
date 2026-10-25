@@ -63,7 +63,8 @@ plus indexes for at most 100000 blocks. Native reads are 65536 bytes. Weak hits 
 require full block hashing; no constant-time/performance advantage is claimed.
 Encrypted or recompressed releases may reuse nothing and need full downloading.
 
-One regular seed and a new staging path are supported. No directory updates,
+One to 32 ordered regular seeds and a new staging path are supported through
+the [multi-file APIs and CLI](update-preview.md). No directory updates,
 shared chunk cache, installed-file replacement, truncation or deletion of foreign
 metadata. Errors retain owned partial staging/checkpoint/lock for normal receiver
 recovery; seed staging itself requires a new path. Seed cooperative locks are

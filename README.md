@@ -3,6 +3,11 @@
 [Read-only update previews](docs/update-preview.md) show reusable blocks and
 logical missing bytes before creating staging or downloading artifact content.
 
+[Acceptance and local packaging](docs/acceptance.md) provides exact reproduction
+commands and explicit delivery limits. [Independent consumer](integration/downstream/README.md)
+uses this checkout as a separate workspace dependency; no Mooncakes publication
+or published MoonFetchLedger package is required.
+
 Portable [signed release authorization](docs/signed-releases.md) binds an
 independently pinned publisher key, product/channel, version and expiry to the
 exact delta metadata. It reuses the published MoonBit Ed25519 package; it is
@@ -67,7 +72,12 @@ downloads, authentication and progress are shared capabilities, not novelty clai
 - [Complete delta update workflow](docs/delta-update.md): bounded hash-pinned HTTP
   metadata, moved-block staging, gap downloads, explicit resume and verified
   delivery through `host.update_from_seed` and `cmd/update`. Run
-  `moon run scripts/delta_update_demo.mbtx`; signed metadata trust is still planned.
+  `moon run scripts/delta_update_demo.mbtx`; [signed updates](docs/signed-releases.md)
+  authenticate publisher metadata using an independently provisioned public key.
+- Multiple ordered old files jointly supply verified target blocks. Preview and
+  update APIs expose total scan/candidate-hash budgets; signed CLI updates accept
+  the same pool and limits. Exceeded limits refuse staging rather than skipping
+  matches or silently downloading everything. Resume retains verified coverage.
 - Verified local-file adoption: bounded storage indexing, whole-digest gating,
   new recovery checkpoint and later selective repair without changing original bytes.
 - Verified export to a new ready-to-use path: source reconciliation, copied-byte
@@ -208,7 +218,10 @@ WebDAV operations, model discovery/cache layout, tus uploads and content-defined
 deduplication belong to their respective upstream projects. We make no claim of
 ecosystem uniqueness or performance superiority. API review: `docs/ecosystem.md`.
 
-Planned: signed release metadata integration and a browser storage
-adapter, driven by downstream needs. [Design and roadmap](docs/design.md).
+Planned: automatic trust-anchor distribution/rotation and a browser storage
+adapter, driven by downstream needs. Directory synchronization, shared chunk
+caching and installed-file replacement remain outside the current delivery.
+[Design and roadmap](docs/design.md). Standalone workflows require the current
+stable toolchain's import frontmatter: [toolchain notes](docs/toolchain.md).
 
 Apache-2.0. Data/dependency sources: `THIRD_PARTY_NOTICES.md`.

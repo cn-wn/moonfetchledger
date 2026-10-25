@@ -84,6 +84,10 @@ No additional upstream code/test suite or cryptographic signature code was copie
   APIs; no external recovery command or test suite was copied.
 
 Dependencies retain copyright/license notices in their own distribution.
+- Local archive path checks, exact-source package round-trip, deterministic
+  content receipts and extracted-package execution are project-authored
+  Apache-2.0, using the toolchain's local packaging and system archive tools.
+  No third-party packaging code or test suite was copied; nothing is uploaded.
 - The independent resource-maintainer module and workspace driver are
   project-authored Apache-2.0 and call only public library/dependency APIs.
   Its default input reuses the public-domain USGS fixture; no external

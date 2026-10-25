@@ -47,6 +47,9 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           moon run --deny-warn scripts/verify.mbtx
+      - name: Verify local source package without publishing
+        if: runner.os == 'Linux'
+        run: moon run --deny-warn scripts/package_check.mbtx
   webdav-interop:
     timeout-minutes: 10
     runs-on: ubuntu-latest

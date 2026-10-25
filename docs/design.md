@@ -111,7 +111,15 @@ the demo serves the bundled public-domain USGS snapshot over loopback.
   pin-before-parse loading and read-only native audit of unmanaged damaged files.
 - Implemented: reconstruct repair checkpoints from independently pinned complete
   block references when an unmanaged file is already damaged.
-- Planned: signed release metadata integration beyond independent SHA-256 pins.
+- Implemented: moved-block cross-version scanning, multi-file union preview and
+  reconstruction, cumulative scan/hash admission and explicit retry after limits.
+- Implemented: signed publisher metadata, protected persistent version acceptance,
+  authenticated artifact transfer and a CLI combining multi-seed staging,
+  bounded scanning, gap reception, pause/resume and exact verified export.
+- Implemented: an independent downstream module using public APIs through a local
+  workspace dependency, without requiring this package to be registry-published.
+- Planned: automatic trust-anchor distribution/rotation; the current signed
+  workflow requires independently provisioned publisher keys.
 - Planned: independent browser storage adapter with the same receive contract;
   versioned checkpoint migrations only when a concrete schema extension is needed.
 

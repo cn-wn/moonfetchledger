@@ -1,0 +1,177 @@
+----
+
+///|
+import {
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/x@0.5.5/crypto",
+}
+----
+
+///|
+fn hash(bytes : Bytes) -> String {
+  @crypto.bytes_to_hex_string(@crypto.sha256(bytes))
+}
+
+///|
+fn valid_path(path : String) -> Bool {
+  if path.is_empty() ||
+    path.has_prefix("/") ||
+    path.contains("\\") ||
+    path.contains(" ") ||
+    path.contains("\t") ||
+    path.contains(":") ||
+    path.contains("\u0000") {
+    return false
+  }
+  for part in path.split("/") {
+    if part.is_empty() ||
+      part == "." ||
+      part == ".." ||
+      [".git", ".mooncakes", "_build", "target"].contains(part.to_owned()) {
+      return false
+    }
+  }
+  true
+}
+
+///|
+async fn copy_cache(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination)
+  for name in @fs.readdir(source) {
+    match @fs.kind(source + "/" + name) {
+      Directory => copy_cache(source + "/" + name, destination + "/" + name)
+      Regular =>
+        @fs.write_file(
+          destination + "/" + name,
+          @fs.read_file(source + "/" + name).binary(),
+        )
+      _ => fail("unsupported dependency cache entry")
+    }
+  }
+}
+
+///|
+async fn main {
+  for
+    path in [
+      "../escape", "/absolute", "C:/drive", "a\\b", "a//b", "./a", ".git/config",
+      "a/../b", "_build/x",
+    ] {
+    assert_true(!valid_path(path))
+  }
+  assert_true(valid_path("fixtures/earthquakes-2024-01-01.csv"))
+  let root = @fs.realpath(".")
+  let packed = @shell.Cmd("moon", ["package", "--frozen"]).output(
+    timeout_ms=180000,
+  )
+  packed.check()
+  let mut archive = ""
+  for line in (packed.stdout() + "\n" + packed.stderr()).split("\n") {
+    let text = line.trim().to_owned()
+    if text.has_prefix("Package to ") {
+      archive = text[11:].to_owned()
+    }
+  }
+  if archive.is_empty() {
+    fail("moon package did not report its local archive path")
+  }
+  let windows = @env.get_env_var("OS") == Some("Windows_NT")
+  let listed = if windows {
+    @shell.Cmd("tar", ["-tf", archive]).output()
+  } else {
+    @shell.Cmd("python3", ["-m", "zipfile", "-l", archive]).output()
+  }
+  listed.check()
+  let names : Array[String] = []
+  let expected : Map[String, Bytes] = Map([])
+  for index, entry in listed.stdout().split("\n").collect() {
+    let line = entry.trim().to_owned()
+    if line.is_empty() {
+      continue
+    }
+    let name = if windows {
+      line
+    } else {
+      if index == 0 {
+        if !line.has_prefix("File Name") {
+          fail("unexpected zipfile list header")
+        }
+        continue
+      }
+      let fields = line.split(" ").filter(p => !p.is_empty()).collect()
+      if fields.length() != 4 {
+        fail("unsupported whitespace or ZIP listing record")
+      }
+      fields[0].to_owned()
+    }
+    if !valid_path(name) || names.contains(name) {
+      fail("unsafe, duplicate or unsupported package path: \{name}")
+    }
+    if @fs.kind(name, follow_symlink=false) != Regular {
+      fail("package entry has no matching regular source file: \{name}")
+    }
+    names.push(name)
+    expected[name] = @fs.read_file(name).binary()
+  }
+  for
+    required in [
+      "moon.mod", "moon.pkg", "LICENSE", "README.md", "THIRD_PARTY_NOTICES.md", "host/pkg.generated.mbti",
+      "fixtures/earthquakes-2024-01-01.csv", "integration/downstream/moon.mod", "scripts/downstream_demo.mbtx",
+    ] {
+    assert_true(expected.contains(required))
+  }
+  names.sort()
+  let rows = names.map(name => {
+    Json::array([Json::string(name), Json::string(hash(expected[name]))])
+  })
+  let fingerprint = Json::array(rows).stringify()
+  let archive_hash = hash(@fs.read_file(archive).binary())
+  let dir = @fs.tmpdir(prefix="mfl-package-roundtrip-")
+  defer @fs.rmdir(dir, recursive=true)
+  if windows {
+    @shell.Cmd("tar", ["-xf", archive, "-C", dir]).run()
+  } else {
+    @shell.Cmd("python3", ["-m", "zipfile", "-e", archive, dir]).run()
+  }
+  for name in names {
+    assert_eq(@fs.read_file(dir + "/" + name).binary(), expected[name])
+  }
+  copy_cache(root + "/.mooncakes", dir + "/.mooncakes")
+  for
+    args in [
+      ["check", "--frozen", "--target", "all", "--deny-warn"],
+      ["test", "--frozen", "--target", "wasm", "--deny-warn"],
+      ["run", "--frozen", "--target", "native", "--deny-warn", "examples/delta"],
+      ["run", "--deny-warn", "scripts/downstream_demo.mbtx"],
+    ] {
+    @shell.Cmd("moon", args, cwd=dir).run(timeout_ms=180000)
+  }
+  for name in names {
+    assert_eq(@fs.read_file(dir + "/" + name).binary(), expected[name])
+    assert_eq(@fs.read_file(root + "/" + name).binary(), expected[name])
+  }
+  let readback : Array[Json] = []
+  for name in names {
+    readback.push(
+      Json::array([
+        Json::string(name),
+        Json::string(hash(@fs.read_file(dir + "/" + name).binary())),
+      ]),
+    )
+  }
+  let again = Json::array(readback).stringify()
+  assert_eq(again, fingerprint)
+  let report = Json::array([
+    Json::string("MFLPACKAGE1"),
+    Json::string(archive_hash),
+    Json::array(rows),
+  ])
+  @fs.write_file("_build/publish/package-check.json", report.stringify() + "\n")
+  println(
+    "local package round trip verified: \{names.length()} exact source files, four-target strict check, wasm tests, native delta and separate downstream execution; SHA-256 receipt in _build/publish/package-check.json; nothing published",
+  )
+}

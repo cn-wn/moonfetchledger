@@ -1,19 +1,20 @@
-**1、项目名称：** MoonFetchLedger——面向现有下载客户端的区块完整性审计与修复层。
+**1、项目名称：** MoonFetchLedger——基于 MoonBit 的通用文件增量更新与完整性恢复库。
 
-**2、项目简介：** 面向 MoonBit 文件分发、数据采集和离线部署开发者，解决文件长度正确但内容受损、非连续区块缺失、检查点与磁盘状态不一致的问题。重新核验实际存储，保留有效区块，仅修复缺口，完成时以可信 SHA-256 校验整文件。
+**2、项目简介及审核后改进：** 针对上次指出的“局限于单文件损坏修复，缺少跨版本复用、可信元数据分发和完整更新流程”，已新增目标区块索引、滚动/强摘要匹配、签名发布描述、持久化版本接受以及发布到验证交付的实际 CLI 工作流。
 
-**3、项目方向与通用性：** 开发工具与基础库。可复用账本核心支持 Wasm、Wasm-GC、JavaScript、原生目标；原生适配层提供磁盘工作流及 WebDAV 集成。适用于具备已知长度、强 ETag 和可信摘要的单文件制品；WebDAV 适配保留上游 2147483647 字节限制。
+**3、方向及通用性：** 基础库与开发工具，服务数据集、模型权重、离线资源包维护者。核心支持 Wasm、Wasm-GC、JavaScript 和原生目标，磁盘及网络工作流使用原生平台。继续复用既有 WebDAV 客户端传输，新增层负责更新决策、内容校验与恢复。
 
 **4、至少三个完整使用场景：**
 
-- **既有 WebDAV 文件修复：** 原客户端下载完整文件→可信摘要校验并建立账本→后续离线审计发现同长度文件中的坏块→通过原客户端区间 API 只重取坏块→整文件验证后导出使用。
-- **弱网与非连续缺口恢复：** 应用分块接收并保存确认记录→中断或部分区块损坏→重启回读并保留有效区块→暂停后继续修复剩余缺口→校验完整制品交付业务程序。
-- **离线部署：** 源站不可用→审计保留文件→完整校验本地可信备份→只复制缺失或损坏区块并回读确认→校验后导出到新路径，保留原有恢复现场。
+- **跨版本更新：** 发布者生成目标索引和签名描述→客户端验证发布者、版本与有效期→从旧文件任意偏移复用匹配区块→仅下载缺口→全文校验后导出新版并保留旧版。
+- **残缺副本联合交付：** 提供多个不完整旧文件→只读预览联合复用量与缺口→在总扫描/哈希预算内重建→补齐剩余区块→验证并导出完整文件。
+- **私有资源恢复：** 认证签名元数据→以绑定目标地址的临时凭据下载→暂停或凭据失效后保留已确认进度→更换凭据后跨进程恢复→验证交付。
+- **离线损坏修复：** 文件同长度损坏、检查点丢失→依据独立可信区块参考重建有效覆盖→通过既有客户端或可信本地备份修复坏块→全文验证。
 
-**5、核心功能与当前成果：** 已实现稀疏覆盖账本、对象绑定租约、写后回读确认、严格检查点、离线审计、本地采纳/修复、验证后导出、中断检查点恢复，以及已发布 WebDAV 客户端的实际集成。真实 USGS 数据演示验证：28008 字节文件中一个字节损坏，保留 23912 字节并只修复一个区块；另覆盖编码响应拒绝、非连续坏块跨暂停修复和源站关闭后的零下载重用。签名发布元数据及浏览器存储适配属于后续计划。
+**5、核心成果及计划：** 上述新增能力均已实现，并接通多旧文件、扫描预算与签名更新入口。另提供独立下游模块验证公开 API 接入，提供本地打包/解包后检查入口。自动密钥分发轮换、目录同步、共享区块缓存、原地安装仍未实现；当前不发布到 Mooncakes。
 
-**6、原创、移植或参考关系：** 在现有 MoonBit 生态项目上构建的功能扩展，账本与修复逻辑独立实现，非 WebDAV 或 modelhub 的移植/分叉。承认断点续传、认证、进度、缓存等已有能力，不作为独有贡献。
+**6、项目性质：** 参考成熟方法、在 MoonBit 生态上独立实现的功能扩展，采用 Apache-2.0；非 WebDAV、modelhub 或 zsync 的移植/分叉。不以普通续传作为独有能力，不宣称生态唯一或性能优势。
 
-**7、上游来源及许可证：** 实际依赖 [q2316367743/webdav](https://github.com/q2316367743/webdav) 与 [moonhttp](https://github.com/q2316367743/moonhttp)（均 Apache-2.0），复用下载、条件区间请求和传输接口，增加完整性与恢复层。[modelhub](https://github.com/QUHONGYE-gif/moonkit-modelhub) 为对比参考，尚未集成。项目采用 Apache-2.0；[详细 API 对比、来源与边界](https://github.com/cn-wn/moonfetchledger/blob/main/docs/ecosystem.md)可核验。
+**7、参考来源及许可证：** [zsync](https://github.com/cph6/zsync)（Artistic-2.0）提供滚动校验/强摘要匹配思路，未复制实现且不兼容 `.zsync`；实际复用 [webdav](https://github.com/q2316367743/webdav)、[moonhttp](https://github.com/q2316367743/moonhttp)、[mbt-ed25519](https://github.com/hustcer/mbt-ed25519)（均 Apache-2.0）。modelhub 仅作对比，未集成。完整来源见 `THIRD_PARTY_NOTICES.md`。
 
-**8、GitHub 仓库与提交：** [cn-wn/moonfetchledger](https://github.com/cn-wn/moonfetchledger)，[提交记录](https://github.com/cn-wn/moonfetchledger/commits/main/)含不少于 10 次实质功能提交，覆盖实现、测试和文档，无空提交或重复提交。复现：`moon update` 后运行 `moon run --target native examples/webdav`；完整验证入口为 `moon run scripts/verify.mbtx`。
+**8、仓库及验证：** [cn-wn/moonfetchledger](https://github.com/cn-wn/moonfetchledger)，[主分支历史](https://github.com/cn-wn/moonfetchledger/commits/main/)含不少于 10 次实质提交，无空提交或重复凑数。执行 `moon run --deny-warn scripts/verify.mbtx`；[审核意见与可运行证据](https://github.com/cn-wn/moonfetchledger/blob/main/docs/differentiation-proof.md)、[交付检查说明](https://github.com/cn-wn/moonfetchledger/blob/main/docs/acceptance.md)明确当前成果及限制。

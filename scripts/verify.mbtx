@@ -47,7 +47,7 @@ async fn main {
     "scripts/auth_demo.mbtx", "scripts/manifest_demo.mbtx", "scripts/checkpoint_recovery_demo.mbtx",
     "scripts/reference_demo.mbtx", "scripts/reference_recovery_demo.mbtx", "scripts/wsgidav_demo.mbtx",
     "scripts/delta_update_demo.mbtx", "scripts/signed_update_demo.mbtx", "scripts/seed_pool_demo.mbtx",
-    "scripts/downstream_demo.mbtx", "integration/downstream/main.mbt",
+    "scripts/downstream_demo.mbtx", "integration/downstream/main.mbt", "scripts/package_check.mbtx",
   ])
   checked(["info"])
   checked(["info", "--target", "native"])

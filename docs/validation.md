@@ -1,4 +1,35 @@
-# Validation record — 2026-10-22
+# Validation record — 2026-10-26
+
+Current stable validation uses isolated official Linux moon/moonrun
+0.1.20261023 and moonc v0.10.17+d971670cd (2026-10-23). Each downloaded binary
+matched its official SHA-256. Strict all-target checking, 49 tests on each of
+wasm/wasm-gc/JS and 132 actual native tests passed. The new signed-pool tests
+cover conflicting controls, duplicate/empty/too-many seeds, protected state
+aliases, cumulative budget failures retaining accepted versions, increased-limit
+retry, exact export and offline reopen. The actual signed CLI exercises two
+partial seeds and scan-budget errors before its pause/rotation/resume flow.
+
+The independent downstream module compiles and runs as a workspace dependency,
+uses only public APIs and verifies multi-file signed delivery without artifact
+requests, exactly one repaired block, input preservation and offline reopen.
+The driver also checks an invalid input is refused. It seeds only installed
+third-party dependencies into its disposable workspace with frozen resolution.
+
+Current stable deprecated unfenced script imports. The first push's three-system
+runtime jobs passed, while its separate strict WsgiDAV job exposed this warning.
+All shipped scripts now use import frontmatter and the main driver also compiles
+every child workflow strictly. The migration push restored actual WsgiDAV CI;
+its main jobs then exposed one driver formatting difference, corrected with the
+current formatter alongside the downstream workflow. Historical CI outcomes
+remain visible; they are not represented as clean passes.
+
+Local package round-trip validation passed with 175 exact source files, strict
+four-target checks, 49 wasm tests, native delta and independent-consumer execution
+from the extracted archive. Its exact-byte SHA-256 receipt is described in
+[acceptance.md](acceptance.md). This is packaging/execution evidence,
+not registry publication; no Mooncakes upload or installation of a published
+MoonFetchLedger is claimed. Below are earlier milestone records, with counts
+and toolchain versions specific to those earlier revisions.
 
 Candidate-work admission adds two portable tests and two native tests: 49
 portable / 130 native total. They cover atomic two-window admission, explicit
