@@ -124,6 +124,11 @@ pub async fn receive_from(
   }
   let file = @fs.open(output, mode=ReadWrite, create_mode=OpenOrCreate)
   defer file.close()
+  if file.kind() != Regular {
+    raise InvalidInput(
+      "receiver output must be a regular file; retain the existing session paths",
+    )
+  }
   let size = file.size()
   if size > spec.length {
     raise InvalidInput("output contains extra data; refusing to truncate")

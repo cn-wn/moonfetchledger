@@ -1,0 +1,129 @@
+----
+import {
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/process",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+----
+
+///|
+async fn ready(child : @process.Process, dir : String) -> Unit {
+  for _ in 0..<200 {
+    if @fs.exists(dir + "/ready") {
+      return
+    }
+    if child.try_wait() is Some(code) {
+      fail(
+        "fault worker exited before barrier: \{code}\n" +
+        @fs.read_file(dir + "/child.log").text(),
+      )
+    }
+    @async.sleep(50)
+  }
+  fail("fault worker did not reach a synced-state barrier")
+}
+
+///|
+async fn main {
+  @shell.Cmd("moon", [
+    "build", "--release", "--target", "native", "--deny-warn", "-j", "2", "cmd/fault-worker",
+  ]).run(timeout_ms=180000)
+  let root = @fs.realpath(".")
+  let binary = root +
+    "/_build/native/release/build/cmd/fault-worker/fault-worker.exe"
+  let dir = @fs.tmpdir(prefix="mfl-fault-matrix-")
+  defer @fs.rmdir(dir, recursive=true)
+  let fixture = @fs.read_file("fixtures/earthquakes-2024-01-01.csv").binary()
+  let cases = ["saved", "pending", "checkpoint-fail"]
+  if @env.get_env_var("OS") != Some("Windows_NT") && @fs.exists("/dev/full") {
+    cases.push("disk-full")
+  } else {
+    println("[\"MFLFAULT1\",\"disk-full\",\"skipped-no-linux-dev-full\"]")
+  }
+  if @env.get_env_var("OS") != Some("Windows_NT") &&
+    @fs.exists("/proc/self/oom_score_adj") {
+    cases.push("write-refusal")
+  } else {
+    println(
+      "[\"MFLFAULT1\",\"write-refusal\",\"skipped-no-linux-proc-endpoint\"]",
+    )
+  }
+  for mode in cases {
+    let work = dir + "/" + mode
+    @fs.mkdir(work)
+    @fs.write_file(
+      work + "/owner",
+      b"MFLFAULT-DIRECTORY1",
+      create_mode=CreateNew,
+    )
+    @fs.write_file(work + "/publisher", fixture, create_mode=CreateNew)
+    if mode == "saved" || mode == "pending" {
+      @async.with_task_group(group => {
+        let log = @process.redirect_to_file(work + "/child.log")
+        defer log.close()
+        let child = @process.spawn(
+          group,
+          binary,
+          [mode, work],
+          stdout=log,
+          stderr=log,
+          no_console_window=true,
+          cancel_handler=@process.hard_cancel(),
+        )
+        ready(child, work)
+        child.cancel()
+        assert_true(child.wait() != 0)
+      })
+    }
+    let command = if mode == "saved" {
+      "resume"
+    } else if mode == "pending" {
+      "recover-pending"
+    } else {
+      mode
+    }
+    let result = @shell.Cmd(binary, [command, work]).output(timeout_ms=30000)
+    if result.exit_code() != 0 {
+      println("fault worker failed in \{mode}:\n" + result.stderr())
+    }
+    result.check()
+    let row = @json.parse(result.stdout().trim())
+    let retained = if mode == "pending" {
+      "8192"
+    } else if mode == "disk-full" || mode == "write-refusal" {
+      "0"
+    } else {
+      "4096"
+    }
+    let blocks = if mode == "pending" {
+      "5"
+    } else if mode == "disk-full" || mode == "write-refusal" {
+      "7"
+    } else {
+      "6"
+    }
+    guard row
+      is [
+        String("MFLFAULT1"),
+        String(label),
+        String(bytes),
+        String(fetched),
+        String(hash),
+      ] &&
+      label == command &&
+      bytes == retained &&
+      fetched == blocks &&
+      hash == "dca55780e807e6b6dc5dafe53a621bf99929681551ab85bb4a27f5142e208042" else {
+      fail("fault worker result does not prove expected recovery")
+    }
+    assert_eq(@fs.read_file(work + "/publisher").binary(), fixture)
+    assert_eq(@fs.read_file(work + "/staging").binary(), fixture)
+    println(row.stringify())
+  }
+  println(
+    "fault matrix verified: owned child hard-kill at saved/pending barriers, explicit pending recovery, failed checkpoint installation and platform-available kernel write/refusal fixtures; exact content and preserved publisher",
+  )
+}

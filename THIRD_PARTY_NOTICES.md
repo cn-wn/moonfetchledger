@@ -84,6 +84,11 @@ No additional upstream code/test suite or cryptographic signature code was copie
   APIs; no external recovery command or test suite was copied.
 
 Dependencies retain copyright/license notices in their own distribution.
+- Owned-process fault workers, state barriers, pending-candidate construction
+  through public APIs and storage error/refusal tests are project-authored
+  Apache-2.0. They reuse only the public-domain USGS fixture and existing APIs.
+  Linux device/proc fixtures are explicitly separate from ordinary-file ENOSPC
+  and power-loss guarantees. No external failure-injection implementation copied.
 - The native synthetic workload generator, streaming fixtures, expected-coverage
   checks, loopback HTTP matrix and measurement driver are project-authored
   Apache-2.0. Xorshift32 is used only to generate deterministic test bytes, not

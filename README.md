@@ -13,6 +13,10 @@ damage, insertion/deletion, reordering and low-reuse seeds using real loopback
 HTTP and source-preservation assertions. Large synthetic inputs are opt-in;
 metrics distinguish missing content, actual body traffic and worker peak RSS.
 
+[Process/storage fault tests](docs/fault-matrix.md) terminate owned workers at
+saved-state barriers, verify explicit pending recovery and checkpoint failures,
+and test platform-specific kernel I/O refusal without claiming power-loss safety.
+
 Portable [signed release authorization](docs/signed-releases.md) binds an
 independently pinned publisher key, product/channel, version and expiry to the
 exact delta metadata. It reuses the published MoonBit Ed25519 package; it is
