@@ -8,6 +8,11 @@ commands and explicit delivery limits. [Independent consumer](integration/downst
 uses this checkout as a separate workspace dependency; no Mooncakes publication
 or published MoonFetchLedger package is required.
 
+[Measured workloads](docs/stress-matrix.md) compare full download with offset,
+damage, insertion/deletion, reordering and low-reuse seeds using real loopback
+HTTP and source-preservation assertions. Large synthetic inputs are opt-in;
+metrics distinguish missing content, actual body traffic and worker peak RSS.
+
 Portable [signed release authorization](docs/signed-releases.md) binds an
 independently pinned publisher key, product/channel, version and expiry to the
 exact delta metadata. It reuses the published MoonBit Ed25519 package; it is

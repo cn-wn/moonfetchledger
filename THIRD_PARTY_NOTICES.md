@@ -84,6 +84,11 @@ No additional upstream code/test suite or cryptographic signature code was copie
   APIs; no external recovery command or test suite was copied.
 
 Dependencies retain copyright/license notices in their own distribution.
+- The native synthetic workload generator, streaming fixtures, expected-coverage
+  checks, loopback HTTP matrix and measurement driver are project-authored
+  Apache-2.0. Xorshift32 is used only to generate deterministic test bytes, not
+  cryptographic randomness. No external benchmark implementation or tests were
+  copied. Measured artifact-body traffic is not a network-billing claim.
 - Local archive path checks, exact-source package round-trip, deterministic
   content receipts and extracted-package execution are project-authored
   Apache-2.0, using the toolchain's local packaging and system archive tools.

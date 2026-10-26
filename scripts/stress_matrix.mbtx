@@ -1,0 +1,129 @@
+----
+import {
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string" @strconv,
+}
+----
+
+///|
+fn integer(text : String, low : Int32, high : Int32) -> Int32 raise {
+  let n = @strconv.parse_int(text)
+  if n < low || n > high || n.to_string() != text {
+    fail("invalid canonical numeric control")
+  }
+  n
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let sizes = [10]
+  let cases = [
+    "baseline", "identical", "shifted", "sparse", "insert-delete", "reordered", "low-reuse",
+  ]
+  let mut chunk = 1024
+  let mut delay = 0
+  let mut repeat = 1
+  let seen : Map[String, Bool] = Map([])
+  for i = 1; i < args.length(); {
+    let key = args[i]
+    if key == "--help" {
+      println(
+        "stress_matrix.mbtx [--sizes 10,100,1024] [--cases baseline,shifted,...] [--chunk-kib 1..4096] [--delay-ms 0..1000] [--repeat 1..10]. Generates synthetic files (+17-byte tail), real loopback HTTP, per-child release metrics; no publication.",
+      )
+      return
+    }
+    if seen.contains(key) || i + 1 >= args.length() {
+      fail("duplicate/missing workload control")
+    }
+    seen[key] = true
+    let value = args[i + 1]
+    match key {
+      "--sizes" => {
+        sizes.clear()
+        for n in value.split(",") {
+          let mib = integer(n.to_owned(), 1, 1024)
+          if sizes.contains(mib) {
+            fail("duplicate workload size")
+          }
+          sizes.push(mib)
+        }
+      }
+      "--cases" => {
+        let selected : Array[String] = []
+        for name in value.split(",") {
+          let name = name.to_owned()
+          if !cases.contains(name) || selected.contains(name) {
+            fail("unknown/duplicate case")
+          }
+          selected.push(name)
+        }
+        cases.clear()
+        cases.append(selected)
+      }
+      "--chunk-kib" => chunk = integer(value, 1, 4096)
+      "--delay-ms" => delay = integer(value, 0, 1000)
+      "--repeat" => repeat = integer(value, 1, 10)
+      _ => fail("unknown workload control")
+    }
+    continue i + 2
+  }
+  @shell.Cmd("moon", [
+    "build", "--release", "--target", "native", "--deny-warn", "-j", "2", "cmd/workload",
+  ]).run(timeout_ms=180000)
+  let root = @fs.realpath(".")
+  let binary = root + "/_build/native/release/build/cmd/workload/workload.exe"
+  if !@fs.exists(binary) {
+    fail("native artifact path changed; update the driver explicitly")
+  }
+  @fs.mkdir("_build/stress", allow_exist=true)
+  let stamp = @env.now().to_string()
+  let data = root + "/_build/stress/data-" + stamp
+  @fs.mkdir(data)
+  defer @fs.rmdir(data, recursive=true)
+  let rows : Array[Json] = []
+  let mut index = 0
+  for mib in sizes {
+    for scenario in cases {
+      for trial in 0..<repeat {
+        println("stress: \{mib} MiB +17, \{scenario}, trial \{trial+1}")
+        let output = @shell.Cmd(binary, [
+          "matrix",
+          scenario,
+          mib.to_string(),
+          chunk.to_string(),
+          delay.to_string(),
+          data + "/" + index.to_string(),
+        ]).output(timeout_ms=1800000)
+        output.check()
+        let row = @json.parse(output.stdout().trim())
+        guard row is [String("MFLSTRESS1"), String(name), ..] &&
+          name == scenario else {
+          fail("unexpected workload record")
+        }
+        rows.push(row)
+        @fs.write_file(
+          "_build/stress/" + stamp + "-" + index.to_string() + ".json",
+          row.stringify() + "\n",
+          create_mode=CreateNew,
+        )
+        println(row.stringify())
+        index += 1
+      }
+    }
+  }
+  let report = Json::array([
+    Json::string("MFLSTRESS-SUITE1"),
+    Json::string(
+      "synthetic-xorshift32-v1;release;loopback;wall-clock-ms;VmHWM-if-available",
+    ),
+    Json::array(rows),
+  ])
+  let path = "_build/stress/" + stamp + ".json"
+  @fs.write_file(path, report.stringify() + "\n", create_mode=CreateNew)
+  println("workload report: " + path)
+}

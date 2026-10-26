@@ -1,0 +1,15 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "cn-wn/moonfetchledger/cmd/workload"
+
+// Values
+
+// Errors
+
+// Types and methods
+type Fixture
+
+type Generator
+
+// Type aliases
+
+// Traits
