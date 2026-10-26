@@ -1,0 +1,148 @@
+----
+import {
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+  "moonbitlang/core/string" @strconv,
+  "moonbitlang/x@0.5.5/crypto",
+}
+----
+
+///|
+async fn fingerprint(path : String) -> String {
+  @crypto.bytes_to_hex_string(@crypto.sha256(@fs.read_file(path).binary()))
+}
+
+///|
+fn bounded(text : String, high : Int32) -> Int32 raise {
+  let value = @strconv.parse_int(text)
+  if value < 1 || value > high || value.to_string() != text {
+    fail("invalid canonical comparison control")
+  }
+  value
+}
+
+///|
+async fn main {
+  let args = @env.args()
+  let values : Map[String, String] = Map([])
+  for i = 1; i < args.length(); {
+    if args[i] == "--help" {
+      println(
+        "compare_scanners.mbtx --baseline CHECKOUT --candidate CHECKOUT [--mib 1..1024] [--chunk-kib 1..4096]. Requires both MFLSTRESS1 workers, builds native release before timing, measures identical/low-reuse in ABBAABBA order, four samples each; asserts all semantic counters, no timing threshold or publication.",
+      )
+      return
+    }
+    if !["--baseline", "--candidate", "--mib", "--chunk-kib"].contains(args[i]) ||
+      values.contains(args[i]) ||
+      i + 1 >= args.length() {
+      fail("unknown/duplicate/missing comparison option")
+    }
+    values[args[i]] = args[i + 1]
+    continue i + 2
+  }
+  let baseline = @fs.realpath(
+    values
+    .get("--baseline")
+    .unwrap_or_else(() => fail("missing --baseline checkout")),
+  )
+  let candidate = @fs.realpath(
+    values
+    .get("--candidate")
+    .unwrap_or_else(() => fail("missing --candidate checkout")),
+  )
+  if baseline == candidate {
+    fail("comparison requires distinct checkouts")
+  }
+  let mib = bounded(values.get("--mib").unwrap_or("100"), 1024)
+  let chunk = bounded(values.get("--chunk-kib").unwrap_or("1024"), 4096)
+  let old_sha = fingerprint(baseline + "/seed_scanner.mbt")
+  let new_sha = fingerprint(candidate + "/seed_scanner.mbt")
+  if old_sha == new_sha {
+    fail("scanner source is identical; no optimization comparison to measure")
+  }
+  for directory in [baseline, candidate] {
+    @shell.Cmd(
+      "moon",
+      [
+        "build", "--release", "--target", "native", "--deny-warn", "-j", "2", "cmd/workload",
+      ],
+      cwd=directory,
+    ).run(timeout_ms=180000)
+  }
+  let suffix = "/_build/native/release/build/cmd/workload/workload.exe"
+  let old_binary = fingerprint(baseline + suffix)
+  let new_binary = fingerprint(candidate + suffix)
+  @fs.mkdir("_build/stress", recursive=true, allow_exist=true)
+  let stamp = @env.now().to_string()
+  let data = @fs.realpath("_build/stress") + "/compare-data-" + stamp
+  @fs.mkdir(data)
+  defer @fs.rmdir(data, recursive=true)
+  let rows : Array[Json] = []
+  let controls : Map[String, Array[Json]] = Map([])
+  for scenario in ["identical", "low-reuse"] {
+    for
+      label in [
+        "baseline", "candidate", "candidate", "baseline", "baseline", "candidate",
+        "candidate", "baseline",
+      ] {
+      let directory = if label == "baseline" { baseline } else { candidate }
+      println("compare: " + scenario + " " + label)
+      let output = @shell.Cmd(
+        directory + suffix,
+        [
+          "matrix",
+          scenario,
+          mib.to_string(),
+          chunk.to_string(),
+          "0",
+          data + "/" + rows.length().to_string(),
+        ],
+        cwd=directory,
+      ).output(timeout_ms=1800000)
+      if output.exit_code() != 0 {
+        fail(
+          "comparison sample failed: \{scenario} \{label}\n" + output.stderr(),
+        )
+      }
+      let row = @json.parse(output.stdout().trim())
+      guard row is Array(fields) &&
+        fields.length() == 16 &&
+        fields[0] == Json::string("MFLSTRESS1") &&
+        fields[1] == Json::string(scenario) else {
+        fail("worker does not implement the required MFLSTRESS1 schema")
+      }
+      let semantic = fields[:11].to_owned()
+      if controls.get(scenario) is Some(previous) {
+        assert_eq(semantic, previous)
+      } else {
+        controls[scenario] = semantic
+      }
+      rows.push(Json::array([Json::string(label), row]))
+      println(Json::array([Json::string(label), row]).stringify())
+    }
+  }
+  assert_eq(fingerprint(baseline + "/seed_scanner.mbt"), old_sha)
+  assert_eq(fingerprint(candidate + "/seed_scanner.mbt"), new_sha)
+  assert_eq(fingerprint(baseline + suffix), old_binary)
+  assert_eq(fingerprint(candidate + suffix), new_binary)
+  let context = Json::array([
+    Json::string(mib.to_string()),
+    Json::string(chunk.to_string()),
+    Json::string("native-release;loopback;delay0;ABBAABBA;4-samples-each"),
+    Json::string(old_binary),
+    Json::string(new_binary),
+  ])
+  let report = Json::array([
+    Json::string("MFLSCAN-COMPARE1"),
+    Json::string(old_sha),
+    Json::string(new_sha),
+    context,
+    Json::array(rows),
+  ])
+  let path = "_build/stress/compare-" + stamp + ".json"
+  @fs.write_file(path, report.stringify() + "\n", create_mode=CreateNew)
+  println("semantic counters match; paired scanner report: " + path)
+}

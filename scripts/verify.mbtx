@@ -48,7 +48,7 @@ async fn main {
     "scripts/reference_demo.mbtx", "scripts/reference_recovery_demo.mbtx", "scripts/wsgidav_demo.mbtx",
     "scripts/delta_update_demo.mbtx", "scripts/signed_update_demo.mbtx", "scripts/seed_pool_demo.mbtx",
     "scripts/downstream_demo.mbtx", "integration/downstream/main.mbt", "scripts/package_check.mbtx",
-    "scripts/stress_matrix.mbtx", "scripts/fault_matrix.mbtx",
+    "scripts/stress_matrix.mbtx", "scripts/fault_matrix.mbtx", "scripts/compare_scanners.mbtx",
   ])
   checked(["info"])
   checked(["info", "--target", "native"])
@@ -86,6 +86,9 @@ async fn main {
     "64",
   ])
   checked(["run", "scripts/fault_matrix.mbtx"])
+  checked([
+    "run", "--deny-warn", "scripts/compare_scanners.mbtx", "--", "--help",
+  ])
   println(
     "verified formatting, interfaces, four core targets, real-data assembly and HTTP/disk recovery",
   )

@@ -34,3 +34,7 @@ other operating systems or asymptotic memory is inferred.
 
 Reproduce and interpret fields using [the workload contract](../stress-matrix.md).
 Generated large inputs are removed; only the small result artifact is committed.
+
+Follow-up: [paired scanner probe experiment](probe-comparison-20261026.md)
+records all sixteen subsequent 100 MiB samples and their unchanged semantic
+counters. Its results do not replace the larger single-sample baseline above.

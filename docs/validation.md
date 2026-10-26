@@ -1,5 +1,36 @@
 # Validation record — 2026-10-26
 
+Scanner-probe revision: current stable Linux strict all-target checks passed,
+with 51 actual tests on each of wasm/wasm-gc/JavaScript and 136 actual native
+tests. Formatting and generated interfaces stayed byte-identical; the public
+API is unchanged. All actual-command recovery, signed update, multi-seed,
+independent-consumer and seven-case HTTP smoke workflows passed, as did the
+five Linux process/storage fault rows. Portable tests include retry with a
+replaced refused suffix and exact budget accounting across input boundaries.
+
+The local source-package round trip passed with 194 exact source files,
+strict four-target checks, 51 wasm tests, native delta delivery and independent
+downstream execution after extraction. Real WsgiDAV also passed same-size
+damage recovery and cross-version pause/reopen delivery through the published
+client. These are actual native executions, not compile-only results. The
+package receipt is local evidence; nothing was uploaded to Mooncakes.
+
+Workload and fault milestones: the 21 actual native HTTP samples at 10/100/1024
+MiB passed exact coverage, body-count, output-digest and source-preservation
+assertions. The process/storage matrix passed three killed-process/checkpoint
+cases on Linux, macOS and Windows CI; Linux also passed the separately documented
+device-boundary and positional-write-refusal cases. These do not simulate
+ordinary-file ENOSPC or power loss. Revision 511b057 passed all three main CI
+jobs plus actual WsgiDAV integration; see [the run](https://github.com/cn-wn/moonfetchledger/actions/runs/40298640286).
+Details and limits: [workloads](stress-matrix.md), [faults](fault-matrix.md).
+
+The subsequent scanner probe experiment preserved all semantic counters across
+sixteen alternating baseline/candidate samples. [Raw results and limits](measurements/probe-comparison-20261026.md)
+describe its local timing observations separately from correctness gates.
+
+Earlier milestone records follow; their test counts and package inventory
+describe those specific revisions.
+
 Current stable validation uses isolated official Linux moon/moonrun
 0.1.20261023 and moonc v0.10.17+d971670cd (2026-10-23). Each downloaded binary
 matched its official SHA-256. Strict all-target checking, 49 tests on each of

@@ -38,6 +38,9 @@ priv struct SeedWindow {
   mut count : Int32
   mut a : UInt32
   mut b : UInt32
+  mut probe_a : UInt32
+  mut probe_b : UInt32
+  mut probe_bucket : Map[String, Array[Int32]]?
 }
 
 ///|
@@ -70,6 +73,9 @@ pub fn DeltaReference::scanner(self : DeltaReference) -> SeedScanner {
           count: 0,
           a: 0U,
           b: 0U,
+          probe_a: 0U,
+          probe_b: 0U,
+          probe_bucket: None,
         }
         windows.push(w)
         w
@@ -117,10 +123,12 @@ pub struct ScanStep {
 }
 
 ///|
-// Compute the next weak-hit cost without changing either rolling window. Both
-// windows must fit before consuming a byte, so the caller can replay its suffix.
-fn SeedWindow::next_hash_cost(self : SeedWindow, byte : Byte) -> Int64 {
-  if self.buckets.is_empty() || self.count < self.width - 1 {
+// Memoize this byte's weak state and lookup without consuming it. Admission
+// probes both windows before advancing either ring/position. A blocked call may
+// replace its unconsumed suffix: every probe is recomputed from committed state.
+fn SeedWindow::probe(self : SeedWindow, byte : Byte) -> Int64 {
+  if self.buckets.is_empty() {
+    self.probe_bucket = None
     return 0L
   }
   let incoming = byte.to_int().reinterpret_as_uint()
@@ -132,7 +140,14 @@ fn SeedWindow::next_hash_cost(self : SeedWindow, byte : Byte) -> Int64 {
     let a = (self.a - outgoing + incoming) & 65535U
     (a, (self.b - self.width.reinterpret_as_uint() * outgoing + a) & 65535U)
   }
-  if self.buckets.contains((b << 16) | a) {
+  self.probe_a = a
+  self.probe_b = b
+  self.probe_bucket = if self.count + 1 >= self.width {
+    self.buckets.get((b << 16) | a)
+  } else {
+    None
+  }
+  if self.probe_bucket is Some(_) {
     self.width.to_int64()
   } else {
     0L
@@ -159,7 +174,10 @@ pub fn SeedScanner::push_bounded(
   let mut hashed = 0L
   for index in 0..<bytes.length() {
     let byte = bytes[index]
-    let cost = self.windows.fold(init=0L, (n, w) => n + w.next_hash_cost(byte))
+    let mut cost = 0L
+    for window in self.windows {
+      cost += window.probe(byte)
+    }
     if cost > max_hash_bytes - hashed {
       return { consumed_bytes: index, hashed_bytes: hashed, blocked: true, }
     }
@@ -173,40 +191,29 @@ pub fn SeedScanner::push_bounded(
       if window.buckets.is_empty() {
         continue
       }
-      let incoming = byte.to_int().reinterpret_as_uint()
       if window.count < window.width {
         window.ring[window.count] = byte
         window.count += 1
-        window.a = (window.a + incoming) & 65535U
-        window.b = (window.b + window.a) & 65535U
       } else {
-        let outgoing = window.ring[window.head].to_int().reinterpret_as_uint()
         window.ring[window.head] = byte
         window.head = (window.head + 1) % window.width
-        window.a = (window.a - outgoing + incoming) & 65535U
-        window.b = (
-            window.b - window.width.reinterpret_as_uint() * outgoing + window.a
-          ) &
-          65535U
       }
-      if window.count == window.width {
+      window.a = window.probe_a
+      window.b = window.probe_b
+      if window.probe_bucket is Some(bucket) {
         let weak = (window.b << 16) | window.a
-        if window.buckets.get(weak) is Some(bucket) {
-          let hash = digest(
-            Bytes::makei(window.width, i => {
-              window.ring[(window.head + i) % window.width]
-            }),
-          )
-          if bucket.get(hash) is Some(indices) {
-            for index in indices {
-              self.offsets[index] = Some(
-                self.position - window.width.to_int64(),
-              )
-            }
-            bucket.remove(hash)
-            if bucket.is_empty() {
-              window.buckets.remove(weak)
-            }
+        let hash = digest(
+          Bytes::makei(window.width, i => {
+            window.ring[(window.head + i) % window.width]
+          }),
+        )
+        if bucket.get(hash) is Some(indices) {
+          for index in indices {
+            self.offsets[index] = Some(self.position - window.width.to_int64())
+          }
+          bucket.remove(hash)
+          if bucket.is_empty() {
+            window.buckets.remove(weak)
           }
         }
       }

@@ -12,6 +12,8 @@ or published MoonFetchLedger package is required.
 damage, insertion/deletion, reordering and low-reuse seeds using real loopback
 HTTP and source-preservation assertions. Large synthetic inputs are opt-in;
 metrics distinguish missing content, actual body traffic and worker peak RSS.
+The [paired scanner experiment](docs/measurements/probe-comparison-20261026.md)
+records unchanged matching/verification counters alongside local timing samples.
 
 [Process/storage fault tests](docs/fault-matrix.md) terminate owned workers at
 saved-state barriers, verify explicit pending recovery and checkpoint failures,
