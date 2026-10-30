@@ -96,6 +96,14 @@ pub async fn reuse_from_seed(
   output : String,
   max_scan_bytes? : Int64,
   max_hash_bytes? : Int64,
+  checkpoint_blocks~ : Int32 = 1,
 ) -> SeedReuseReport {
-  reuse_from_seeds(reference, [seed], output, max_scan_bytes?, max_hash_bytes?)
+  reuse_from_seeds(
+    reference,
+    [seed],
+    output,
+    max_scan_bytes?,
+    max_hash_bytes?,
+    checkpoint_blocks~,
+  )
 }

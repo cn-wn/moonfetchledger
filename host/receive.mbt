@@ -30,9 +30,8 @@ async fn save(session : @ledger.Session, checkpoint : String) -> Unit {
 async fn receive(
   session : @ledger.Session,
   lease : @ledger.Lease,
-  file : @fs.File,
+  batch : CheckpointBatch,
   mutex : @async.Mutex,
-  checkpoint : String,
   fetch_range : async (@ledger.ByteRange) -> ReceivedBlock,
   progress : ProgressTracker,
 ) -> Unit {
@@ -47,18 +46,13 @@ async fn receive(
     total=block.total,
     content_encoding=block.content_encoding,
   )
-  file.write_at(bytes, position=lease.range.start)
-  file.sync()
-  let readback = file.read_exactly_at(
-    bytes.length(),
-    position=lease.range.start,
-  )
   mutex.acquire()
   defer mutex.release()
-  session.commit_written(prepared, readback)
-  save(session, checkpoint)
-  progress.downloaded += 1
-  progress.notify(session, BlockCommitted(lease.range))
+  let saved = batch.append(prepared, lease.range, bytes)
+  progress.downloaded += saved.length()
+  for range in saved {
+    progress.notify(session, BlockCommitted(range))
+  }
 }
 
 ///|
@@ -83,7 +77,9 @@ pub async fn receive_from(
   stop_after_blocks? : Int32,
   on_progress? : async (DownloadProgress) -> Unit,
   pause_signal? : @ledger.PauseSignal,
+  checkpoint_blocks~ : Int32 = 1,
 ) -> DownloadReport {
+  check_checkpoint_blocks(checkpoint_blocks)
   if output.is_empty() ||
     parallel < 1 ||
     parallel > 16 ||
@@ -153,6 +149,7 @@ pub async fn receive_from(
   let progress : ProgressTracker = { callback: on_progress, downloaded: 0, }
   progress.notify(session, Recovered)
   let mutex = @async.Mutex::Mutex()
+  let batch = CheckpointBatch::new(session, file, checkpoint, checkpoint_blocks)
   let mut downloaded = 0
   let budget = stop_after_blocks.unwrap_or(100000)
   while downloaded < budget &&
@@ -161,9 +158,7 @@ pub async fn receive_from(
     for _ in 0..<parallel.min(budget - downloaded) {
       if session.reserve_missing() is Some(lease) {
         jobs.push(() => {
-          receive(
-            session, lease, file, mutex, checkpoint, fetch_range, progress,
-          )
+          receive(session, lease, batch, mutex, fetch_range, progress)
         })
       }
     }
@@ -172,6 +167,11 @@ pub async fn receive_from(
     }
     ignore(@async.all(jobs))
     downloaded += jobs.length()
+  }
+  let saved = batch.flush()
+  progress.downloaded += saved.length()
+  for range in saved {
+    progress.notify(session, BlockCommitted(range))
   }
   let complete = session.confirmed_bytes() == spec.length
   if complete {

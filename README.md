@@ -1,5 +1,9 @@
 # MoonFetchLedger
 
+[Checkpoint batching](docs/checkpoint-batching.md) reduces synced checkpoint
+replacements for small blocks, with bounded unrecorded work and saved-progress
+semantics; the default remains one block per checkpoint.
+
 [Read-only update previews](docs/update-preview.md) show reusable blocks and
 logical missing bytes before creating staging or downloading artifact content.
 

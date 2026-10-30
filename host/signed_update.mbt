@@ -132,7 +132,9 @@ pub async fn update_signed_release(
   auth? : BearerAuth,
   max_scan_bytes? : Int64,
   max_hash_bytes? : Int64,
+  checkpoint_blocks~ : Int32 = 1,
 ) -> SignedUpdateReport {
+  check_checkpoint_blocks(checkpoint_blocks)
   check_scan_limits(max_scan_bytes?, max_hash_bytes?)
   if seed is Some(_) && seeds is Some(_) {
     raise InvalidInput("choose seed or seeds, never both")
@@ -264,6 +266,7 @@ pub async fn update_signed_release(
         max_attempts~,
         request_timeout_ms~,
         auth?,
+        checkpoint_blocks~,
       )
     } else {
       update_from_seeds(
@@ -278,6 +281,7 @@ pub async fn update_signed_release(
         auth?,
         max_scan_bytes?,
         max_hash_bytes?,
+        checkpoint_blocks~,
       )
     }
     {

@@ -223,7 +223,9 @@ pub async fn update_from_seed(
   auth? : BearerAuth,
   max_scan_bytes? : Int64,
   max_hash_bytes? : Int64,
+  checkpoint_blocks~ : Int32 = 1,
 ) -> DeltaUpdateReport {
+  check_checkpoint_blocks(checkpoint_blocks)
   check_scan_limits(max_scan_bytes?, max_hash_bytes?)
   if resuming && (max_scan_bytes is Some(_) || max_hash_bytes is Some(_)) {
     raise InvalidInput(
@@ -251,6 +253,7 @@ pub async fn update_from_seed(
           output,
           max_scan_bytes?,
           max_hash_bytes?,
+          checkpoint_blocks~,
         ),
       )
     None => None
@@ -265,6 +268,7 @@ pub async fn update_from_seed(
     max_attempts~,
     request_timeout_ms~,
     auth?,
+    checkpoint_blocks~,
   )
 }
 
@@ -279,6 +283,7 @@ async fn finish_delta_update(
   max_attempts~ : Int32,
   request_timeout_ms~ : Int32,
   auth? : BearerAuth,
+  checkpoint_blocks~ : Int32,
 ) -> DeltaUpdateReport {
   let received = download(
     reference.spec,
@@ -289,6 +294,7 @@ async fn finish_delta_update(
     max_attempts~,
     request_timeout_ms~,
     auth?,
+    checkpoint_blocks~,
   )
   let exported = if received.complete && export_to is Some(destination) {
     export_verified(reference.spec, output, destination)
@@ -314,7 +320,9 @@ pub async fn update_from_seeds(
   auth? : BearerAuth,
   max_scan_bytes? : Int64,
   max_hash_bytes? : Int64,
+  checkpoint_blocks~ : Int32 = 1,
 ) -> DeltaUpdateReport {
+  check_checkpoint_blocks(checkpoint_blocks)
   check_scan_limits(max_scan_bytes?, max_hash_bytes?)
   if seeds.is_empty() || seeds.length() > 32 {
     raise InvalidInput("update requires 1..32 seeds")
@@ -336,6 +344,7 @@ pub async fn update_from_seeds(
     output,
     max_scan_bytes?,
     max_hash_bytes?,
+    checkpoint_blocks~,
   )
   finish_delta_update(
     reference,
@@ -347,5 +356,6 @@ pub async fn update_from_seeds(
     max_attempts~,
     request_timeout_ms~,
     auth?,
+    checkpoint_blocks~,
   )
 }

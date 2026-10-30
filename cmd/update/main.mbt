@@ -42,6 +42,9 @@ async fn run() -> Unit {
     }
     if flag == "--help" {
       println(
+        "--checkpoint-blocks 1..1024 batches synced checkpoints; default 1. A pending batch can be repeated after failure.",
+      )
+      println(
         "update --publish --source FILE --metadata NEW_FILE --url URL --length N --etag QUOTED_ETAG --sha256 TRUSTED_HEX [--chunk-size N]",
       )
       println(
@@ -88,7 +91,7 @@ async fn run() -> Unit {
         "--source", "--metadata", "--metadata-url", "--metadata-sha256", "--url",
         "--length", "--etag", "--sha256", "--chunk-size", "--seed", "--output", "--export-to",
         "--parallel", "--stop-after-blocks", "--max-attempts", "--request-timeout-ms",
-        "--max-scan-bytes", "--max-hash-bytes",
+        "--max-scan-bytes", "--max-hash-bytes", "--checkpoint-blocks",
       ].contains(flag) ||
       i + 1 >= args.length() ||
       values.contains(flag) {
@@ -168,6 +171,10 @@ async fn run() -> Unit {
     fail("scan limits are only for initial seed scans; omit them on resume")
   }
   let timeout = small(values, "--request-timeout-ms", 30000)
+  let checkpoint_blocks = small(values, "--checkpoint-blocks", 1)
+  if checkpoint_blocks < 1 || checkpoint_blocks > 1024 {
+    fail("--checkpoint-blocks must be 1..1024")
+  }
   let parallel = small(values, "--parallel", 4)
   let attempts = small(values, "--max-attempts", 1)
   let budget = values
@@ -227,6 +234,7 @@ async fn run() -> Unit {
       request_timeout_ms=timeout,
       max_scan_bytes?,
       max_hash_bytes?,
+      checkpoint_blocks~,
     )
   } else {
     @host.update_from_seed(
@@ -241,6 +249,7 @@ async fn run() -> Unit {
       request_timeout_ms=timeout,
       max_scan_bytes?,
       max_hash_bytes?,
+      checkpoint_blocks~,
     )
   }
   if report.seed is Some(seed) {

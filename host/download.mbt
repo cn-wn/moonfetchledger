@@ -13,6 +13,7 @@ pub async fn download(
   on_progress? : async (DownloadProgress) -> Unit,
   pause_signal? : @ledger.PauseSignal,
   auth? : BearerAuth,
+  checkpoint_blocks~ : Int32 = 1,
 ) -> DownloadReport {
   if auth is Some(credential) {
     credential.check_resource(spec.resource)
@@ -39,6 +40,7 @@ pub async fn download(
     stop_after_blocks?,
     on_progress?,
     pause_signal?,
+    checkpoint_blocks~,
     fetch_range=range => {
       let bytes = fetch(
         spec, range, max_attempts, retry_delay_ms, request_timeout_ms, auth,

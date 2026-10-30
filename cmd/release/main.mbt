@@ -98,6 +98,9 @@ async fn run() -> Unit {
     }
     if flag == "--help" {
       println(
+        "--checkpoint-blocks 1..1024 batches synced checkpoints; default 1. A pending batch can be repeated after failure.",
+      )
+      println(
         "release --sign --private-seed-file RAW32 --descriptor NEW_FILE --product ID --channel ID --version N --issued-at UNIX --expires-at UNIX --metadata-url URL --metadata-sha256 HEX",
       )
       println(
@@ -148,7 +151,7 @@ async fn run() -> Unit {
         "--state", "--minimum-version", "--release", "--release-url", "--seed", "--output",
         "--metadata", "--export-to", "--parallel", "--stop-after-blocks", "--max-attempts",
         "--request-timeout-ms", "--bearer-env", "--artifact-url", "--max-scan-bytes",
-        "--max-hash-bytes",
+        "--max-hash-bytes", "--checkpoint-blocks",
       ].contains(flag) ||
       i + 1 >= args.length() ||
       values.contains(flag) {
@@ -171,7 +174,7 @@ async fn run() -> Unit {
       "--public-key-file", "--product", "--channel", "--state", "--minimum-version",
       "--release", "--release-url", "--seed", "--output", "--metadata", "--export-to",
       "--parallel", "--stop-after-blocks", "--max-attempts", "--request-timeout-ms",
-      "--bearer-env", "--artifact-url", "--max-scan-bytes", "--max-hash-bytes",
+      "--bearer-env", "--artifact-url", "--max-scan-bytes", "--max-hash-bytes", "--checkpoint-blocks",
     ]
   }
   for key in values.keys() {
@@ -224,6 +227,10 @@ async fn run() -> Unit {
   }
   let max_scan_bytes = values.get("--max-scan-bytes").map(integer)
   let max_hash_bytes = values.get("--max-hash-bytes").map(integer)
+  let checkpoint_blocks = small(values, "--checkpoint-blocks", 1)
+  if checkpoint_blocks < 1 || checkpoint_blocks > 1024 {
+    fail("--checkpoint-blocks must be 1..1024")
+  }
   if resuming && (max_scan_bytes is Some(_) || max_hash_bytes is Some(_)) {
     fail("scan limits are only for initial updates; omit them on resume")
   }
@@ -285,6 +292,7 @@ async fn run() -> Unit {
     auth?,
     max_scan_bytes?,
     max_hash_bytes?,
+    checkpoint_blocks~,
   )
   report(if result.update.receive.complete { "complete" } else { "paused" }, [
     result.version.to_string(),

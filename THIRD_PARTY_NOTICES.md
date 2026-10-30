@@ -1,5 +1,10 @@
 # Sources and licenses
 
+Bounded checkpoint batching, readback/error/volume tests and its native example
+are project-authored Apache-2.0, using existing filesystem and ledger APIs. The
+example reuses the public-domain USGS fixture. No external persistence code or
+test suite was copied; the on-disk MFL1 format remains unchanged.
+
 No implementation was copied from the comparison projects.
 
 Cross-version seed reuse references the public rolling/strong matching workflow

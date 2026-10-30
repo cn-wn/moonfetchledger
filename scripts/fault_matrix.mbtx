@@ -37,7 +37,7 @@ async fn main {
   let dir = @fs.tmpdir(prefix="mfl-fault-matrix-")
   defer @fs.rmdir(dir, recursive=true)
   let fixture = @fs.read_file("fixtures/earthquakes-2024-01-01.csv").binary()
-  let cases = ["saved", "pending", "checkpoint-fail"]
+  let cases = ["saved", "pending", "batched", "checkpoint-fail"]
   if @env.get_env_var("OS") != Some("Windows_NT") && @fs.exists("/dev/full") {
     cases.push("disk-full")
   } else {
@@ -60,7 +60,7 @@ async fn main {
       create_mode=CreateNew,
     )
     @fs.write_file(work + "/publisher", fixture, create_mode=CreateNew)
-    if mode == "saved" || mode == "pending" {
+    if mode == "saved" || mode == "pending" || mode == "batched" {
       @async.with_task_group(group => {
         let log = @process.redirect_to_file(work + "/child.log")
         defer log.close()
@@ -82,6 +82,8 @@ async fn main {
       "resume"
     } else if mode == "pending" {
       "recover-pending"
+    } else if mode == "batched" {
+      "resume-batched"
     } else {
       mode
     }
@@ -93,6 +95,8 @@ async fn main {
     let row = @json.parse(result.stdout().trim())
     let retained = if mode == "pending" {
       "8192"
+    } else if mode == "batched" {
+      "16384"
     } else if mode == "disk-full" || mode == "write-refusal" {
       "0"
     } else {
@@ -100,6 +104,8 @@ async fn main {
     }
     let blocks = if mode == "pending" {
       "5"
+    } else if mode == "batched" {
+      "3"
     } else if mode == "disk-full" || mode == "write-refusal" {
       "7"
     } else {

@@ -86,7 +86,7 @@ async fn main {
   if args.length() != 3 ||
     ![
       "saved", "pending", "resume", "recover-pending", "checkpoint-fail", "disk-full",
-      "write-refusal",
+      "write-refusal", "batched", "resume-batched",
     ].contains(args[1]) {
     fail("fault-worker MODE OWNED_FIXTURE_DIRECTORY")
   }
@@ -108,6 +108,24 @@ async fn main {
     @ledger.digest(data),
   )
   let output = dir + "/staging"
+  if mode == "batched" {
+    ignore(
+      @host.receive_from(
+        spec,
+        output,
+        chunk_size=4096,
+        parallel=1,
+        checkpoint_blocks=4,
+        fetch_range=range => {
+          if range.start == 24576L {
+            holding(dir)
+          }
+          block(data, range)
+        },
+      ),
+    )
+    fail("batched kill fixture unexpectedly completed")
+  }
   if mode == "saved" || mode == "pending" {
     ignore(
       @host.receive_from(
@@ -260,6 +278,9 @@ async fn main {
     8192L
   } else if mode == "disk-full" || mode == "write-refusal" {
     0L
+  } else if mode == "resume-batched" {
+    assert_eq(@fs.read_file(output).binary().length(), 24576)
+    16384L
   } else {
     4096L
   }

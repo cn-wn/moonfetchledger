@@ -106,7 +106,9 @@ pub async fn reuse_from_seeds(
   output : String,
   max_scan_bytes? : Int64,
   max_hash_bytes? : Int64,
+  checkpoint_blocks~ : Int32 = 1,
 ) -> SeedReuseReport {
+  check_checkpoint_blocks(checkpoint_blocks)
   check_scan_limits(max_scan_bytes?, max_hash_bytes?)
   if output.is_empty() {
     raise InvalidInput("seed pool output is required")
@@ -159,6 +161,12 @@ pub async fn reuse_from_seeds(
     let target = @fs.open(output, mode=ReadWrite, create_mode=CreateNew)
     defer target.close()
     publish_new(output + ".mfl", f => f.write(session.checkpoint()))
+    let batch = CheckpointBatch::new(
+      session,
+      target,
+      output + ".mfl",
+      checkpoint_blocks,
+    )
     let matches = plan.matches()
     for record in matches {
       let source = files[record.seed_index]
@@ -177,14 +185,9 @@ pub async fn reuse_from_seeds(
           "selected seed changed length; retain partial staging",
         )
       }
-      target.write_at(bytes, position=record.target.start)
-      target.sync()
-      session.commit_written(
-        prepared,
-        target.read_exactly_at(bytes.length(), position=record.target.start),
-      )
-      save(session, output + ".mfl")
+      ignore(batch.append(prepared, record.target, bytes))
     }
+    ignore(batch.flush())
     let complete = session.confirmed_bytes() == reference.spec.length
     if complete {
       let verifier = session.verifier()
