@@ -1,7 +1,9 @@
 import {
+  "cn-wn/moonfetchledger" @ledger,
   "cn-wn/moonfetchledger/host",
   "cn-wn/moonfetchledger/release" @signed,
   "moonbitlang/async",
+  "moonbitlang/async/fs",
   "moonbitlang/core/env",
   "moonbitlang/core/string" @strconv,
 }

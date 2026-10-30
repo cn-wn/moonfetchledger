@@ -1,5 +1,6 @@
 import {
   "moonbitlang/async",
+  "moonbitlang/async/fs",
   "cn-wn/moonfetchledger" @ledger,
   "cn-wn/moonfetchledger/host",
   "moonbitlang/core/env",

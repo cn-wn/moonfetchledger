@@ -1,5 +1,9 @@
 # Controlled pause and resume
 
+For a typed pause throughout a complete unsigned/signed update, including scans
+and export, see [UpdateControl](update-control.md). The legacy download-only
+signal described here continues to return an ordinary `DownloadReport`.
+
 An updater's UI or supervising task can request a pause without throwing from its
 progress callback or interrupting a storage write:
 

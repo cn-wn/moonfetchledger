@@ -63,6 +63,7 @@ async fn main {
   let mut metadata = b""
   let mut metadata_gets = 0
   let mut reject_version = false
+  let mut cancel_on_next_range : String? = None
   @async.with_task_group(group => {
     let server = @http.Server::Server(@socket.Addr::parse("127.0.0.1:0"))
     defer server.close()
@@ -90,6 +91,10 @@ async fn main {
             return
           }
           assert_eq(request.path, "/v2")
+          if cancel_on_next_range is Some(marker) {
+            @fs.write_file(marker, b"pause")
+            cancel_on_next_range = None
+          }
           assert_eq(request.headers.get("If-Range"), Some("\"v2\""))
           assert_eq(request.headers.get("Accept-Encoding"), Some("identity"))
           let header = request.headers.get("Range").unwrap_or("")
@@ -267,6 +272,58 @@ async fn main {
     assert_eq(@fs.read_file(ready).binary(), v2)
     assert_eq(@fs.read_file(seed).binary(), old_bytes)
     assert_eq(@fs.read_file(metadata_path).binary(), metadata)
+    // The supervisor requests cancellation while an actual HTTP transfer is
+    // active, rather than only supplying a marker before process startup.
+    let live_marker = dir + "/live-cancel"
+    let live_output = dir + "/live-output"
+    let live_ready = dir + "/live-ready"
+    let empty_seed = dir + "/empty-seed"
+    @fs.write_file(empty_seed, b"")
+    cancel_on_next_range = Some(live_marker)
+    let live = [
+      "--metadata", metadata_path, "--metadata-sha256", pin, "--output", live_output,
+      "--export-to", live_ready, "--parallel", "1", "--checkpoint-blocks", "2", "--progress-json",
+      "--cancel-file", live_marker,
+    ]
+    let live_start = live.copy()
+    live_start.append(["--seed", empty_seed])
+    let live_paused = invoke(live_start)
+    live_paused.check()
+    assert_true(
+      records(live_paused.stdout()).last().unwrap()
+      is [
+        String("MFLUPDATEPROGRESS1"),
+        String("downloading"),
+        String("paused"),
+        String("8192"),
+        String("23943"),
+        String("8192"),
+        True,
+      ],
+    )
+    assert_eq(@fs.read_file(live_output).binary(), v2[:8192].to_owned())
+    assert_true(!@fs.exists(live_ready) && @fs.exists(live_marker))
+    @fs.remove(live_marker)
+    let live_resume = live.copy()
+    live_resume.push("--resume")
+    let live_done = invoke(live_resume)
+    live_done.check()
+    assert_true(
+      records(live_done.stdout()).any(p => {
+        p
+        is [
+          String("MFLUPDATEPROGRESS1"),
+          String("finished"),
+          String("running"),
+          String("23943"),
+          String("23943"),
+          String("23943"),
+          True,
+        ]
+      }),
+    )
+    assert_eq(@fs.read_file(live_ready).binary(), v2)
+    assert_eq(@fs.read_file(empty_seed).binary(), b"")
     ignore(@http.get(base + "/stop"))
     serving.wait()
     let before_reopen = requests.copy()
@@ -294,6 +351,55 @@ async fn main {
     )
     assert_eq(@fs.read_file(dir + "/ready-again").binary(), v2)
     assert_eq(requests, before_reopen)
+    // A file marker cancels before staging. Remove only our own marker, then
+    // retry in a fresh process with a full local seed and no running origin.
+    let marker = dir + "/cancel"
+    let controlled_output = dir + "/controlled"
+    let controlled_ready = dir + "/controlled-ready"
+    @fs.write_file(marker, b"pause")
+    let controlled = [
+      "--metadata", metadata_path, "--metadata-sha256", pin, "--seed", publisher,
+      "--output", controlled_output, "--export-to", controlled_ready, "--checkpoint-blocks",
+      "2", "--progress-json", "--cancel-file", marker,
+    ]
+    let cancelled = invoke(controlled)
+    cancelled.check()
+    assert_true(
+      records(cancelled.stdout()).last().unwrap()
+      is [
+        String("MFLUPDATEPROGRESS1"),
+        String("metadata"),
+        String("paused"),
+        String("0"),
+        String(_),
+        String("0"),
+        False,
+      ],
+    )
+    assert_true(@fs.exists(marker) && !@fs.exists(controlled_output))
+    assert_true(!@fs.exists(controlled_output + ".mfl.lock"))
+    @fs.remove(marker)
+    let delivered = invoke(controlled)
+    delivered.check()
+    assert_true(
+      records(delivered.stdout()).any(p => {
+        p
+        is [
+          String("MFLUPDATEPROGRESS1"),
+          String("finished"),
+          String("running"),
+          String(_),
+          String(_),
+          String(_),
+          True,
+        ]
+      }),
+    )
+    assert_eq(@fs.read_file(controlled_ready).binary(), v2)
+    assert_eq(requests, before_reopen)
+    let duplicate = controlled.copy()
+    duplicate.push("--progress-json")
+    assert_true(invoke(duplicate).exit_code() != 0)
     // A conflicting delivery destination is retained even on completed reopen.
     assert_true(
       invoke([
@@ -305,6 +411,6 @@ async fn main {
     assert_eq(@fs.read_file(ready).binary(), v2)
   })
   println(
-    "delta update CLI verified: publisher -> pinned remote metadata -> moved-block reuse 11655/23943 -> saved pause -> changed-version refusal -> new-process resume -> verified new destination; bad-pin/mode preservation and stopped-origin zero-fetch reopen",
+    "delta update CLI verified: pinned metadata, moved-block reuse, saved pause, changed-version refusal, new-process resume and verified delivery; live HTTP cancellation at saved 8192 bytes, marker retry, stopped-origin zero-fetch reopen",
   )
 }

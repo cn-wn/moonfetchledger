@@ -73,6 +73,7 @@ async fn main {
   checked(["run", "--target", "native", "examples/reference"])
   checked(["run", "--target", "native", "examples/delta"])
   checked(["run", "--target", "native", "examples/batched"])
+  checked(["run", "--target", "native", "examples/update-control"])
   checked(["run", "scripts/auth_demo.mbtx"])
   checked(["run", "scripts/manifest_demo.mbtx"])
   checked(["run", "scripts/checkpoint_recovery_demo.mbtx"])

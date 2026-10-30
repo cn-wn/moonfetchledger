@@ -143,6 +143,7 @@ pub async fn Source::receive(
   on_progress? : async (@host.DownloadProgress) -> Unit,
   pause_signal? : @ledger.PauseSignal,
   checkpoint_blocks~ : Int32 = 1,
+  control? : @host.UpdateControl,
 ) -> @host.DownloadReport {
   @host.receive_from(
     self.spec,
@@ -153,6 +154,7 @@ pub async fn Source::receive(
     on_progress?,
     pause_signal?,
     checkpoint_blocks~,
+    control?,
     fetch_range=range => self.fetch(range),
   )
 }

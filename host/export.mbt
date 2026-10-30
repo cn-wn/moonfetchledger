@@ -18,6 +18,7 @@ pub async fn export_verified(
   spec : @ledger.ObjectSpec,
   output : String,
   destination : String,
+  control? : UpdateControl,
 ) -> Unit {
   if output.is_empty() ||
     destination.is_empty() ||
@@ -53,6 +54,7 @@ pub async fn export_verified(
     ].contains(destination_entry) {
     raise InvalidInput("export destination aliases a source session path")
   }
+  update_tick(control, Verifying, 0L, spec.length, 0L, true)
   let lock = @fs.open(output + ".mfl.lock", mode=ReadOnly)
   defer lock.close()
   if !lock.try_lock(Shared) {
@@ -67,6 +69,7 @@ pub async fn export_verified(
       "export requires exact source length; refusing to trim or pad",
     )
   }
+  let mut confirmed = 0L
   for range in session.recovery_ranges() {
     if !session.reconcile_block(
         range,
@@ -78,9 +81,12 @@ pub async fn export_verified(
         "recorded block [\{range.start},\{range.end}) no longer matches storage; audit and repair before export",
       )
     }
+    confirmed += range.length()
+    update_tick(control, Verifying, range.end, spec.length, confirmed, true)
   }
   session.finish_recovery()
   let copied = session.verifier() // rejects missing/corrupt coverage before creating a temporary file
+  update_tick(control, Exporting, 0L, spec.length, spec.length, true)
   publish_new(destination, target => {
     while copied.next_range() is Some(range) {
       let bytes = source.read_exactly_at(
@@ -89,18 +95,29 @@ pub async fn export_verified(
       )
       target.write_at(bytes, position=range.start)
       copied.push(bytes)
+      update_tick(control, Exporting, range.end, spec.length, spec.length, true)
     }
     copied.finish()
     target.sync()
     let readback = session.verifier()
+    update_tick(control, CheckingExport, 0L, spec.length, spec.length, true)
     while readback.next_range() is Some(range) {
       readback.push(
         target.read_exactly_at(range.length().to_int(), position=range.start),
+      )
+      update_tick(
+        control,
+        CheckingExport,
+        range.end,
+        spec.length,
+        spec.length,
+        true,
       )
     }
     readback.finish()
     if source.size() != spec.length || target.size() != spec.length {
       raise InvalidInput("source or destination length changed during export")
     }
+    update_pause(control, CheckingExport, true)
   })
 }

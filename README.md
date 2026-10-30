@@ -1,5 +1,9 @@
 # MoonFetchLedger
 
+[Full update progress and cancellation](docs/update-control.md) covers metadata,
+seed scanning/reuse, retained-block recovery, download, verification and export,
+with resumable typed pauses and actual-process CLI examples.
+
 [Checkpoint batching](docs/checkpoint-batching.md) reduces synced checkpoint
 replacements for small blocks, with bounded unrecorded work and saved-progress
 semantics; the default remains one block per checkpoint.

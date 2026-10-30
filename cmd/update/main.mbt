@@ -42,6 +42,9 @@ async fn run() -> Unit {
     }
     if flag == "--help" {
       println(
+        "--progress-json emits phase progress. --cancel-file PATH cooperatively pauses when that marker exists; retain it until the pause completes, then remove it before retry/resume.",
+      )
+      println(
         "--checkpoint-blocks 1..1024 batches synced checkpoints; default 1. A pending batch can be repeated after failure.",
       )
       println(
@@ -57,6 +60,13 @@ async fn run() -> Unit {
         "Initial scans accept --max-scan-bytes N and --max-hash-bytes N. These bound seed input and candidate SHA work, not network billing. Omit scan limits on resume.",
       )
       return
+    }
+    if flag == "--progress-json" {
+      if values.contains(flag) {
+        fail("duplicate --progress-json")
+      }
+      values[flag] = "true"
+      continue i + 1
     }
     if flag == "--publish" {
       if publishing {
@@ -91,7 +101,7 @@ async fn run() -> Unit {
         "--source", "--metadata", "--metadata-url", "--metadata-sha256", "--url",
         "--length", "--etag", "--sha256", "--chunk-size", "--seed", "--output", "--export-to",
         "--parallel", "--stop-after-blocks", "--max-attempts", "--request-timeout-ms",
-        "--max-scan-bytes", "--max-hash-bytes", "--checkpoint-blocks",
+        "--max-scan-bytes", "--max-hash-bytes", "--checkpoint-blocks", "--cancel-file",
       ].contains(flag) ||
       i + 1 >= args.length() ||
       values.contains(flag) {
@@ -194,13 +204,15 @@ async fn run() -> Unit {
     timeout > 120000 {
     fail("invalid parallel/attempt/timeout limits; see --help")
   }
+  let control = command_control(values)
   let reference = match values.get("--metadata") {
-    Some(path) => @host.load_delta_reference(path, pin)
+    Some(path) => @host.load_delta_reference(path, pin, control?)
     None =>
       @host.fetch_delta_reference(
         required(values, "--metadata-url"),
         pin,
         request_timeout_ms=timeout,
+        control?,
       )
   }
   if previewing {
@@ -235,6 +247,7 @@ async fn run() -> Unit {
       max_scan_bytes?,
       max_hash_bytes?,
       checkpoint_blocks~,
+      control?,
     )
   } else {
     @host.update_from_seed(
@@ -250,6 +263,7 @@ async fn run() -> Unit {
       max_scan_bytes?,
       max_hash_bytes?,
       checkpoint_blocks~,
+      control?,
     )
   }
   if report.seed is Some(seed) {
@@ -286,9 +300,33 @@ async fn run() -> Unit {
 ///|
 async fn main {
   run() catch {
+    @host.UpdatePaused(_, _) => ()
     error =>
       fail(
         "update failed; retain staging/checkpoint and use --resume after correction: \{Repr(error)}",
       )
   }
+}
+
+///|
+fn command_control(values : Map[String, String]) -> @host.UpdateControl? raise {
+  let verbose = values.contains("--progress-json")
+  let marker = values.get("--cancel-file")
+  if marker is Some(path) && path.is_empty() {
+    fail("--cancel-file requires a nonempty path")
+  }
+  if !verbose && marker is None {
+    return None
+  }
+  let signal = @ledger.PauseSignal::new()
+  Some(
+    @host.UpdateControl::new(pause_signal=signal, on_progress=p => {
+      if verbose || p.paused {
+        println(p.to_json().stringify())
+      }
+      if marker is Some(path) && @fs.exists(path) {
+        signal.request_pause()
+      }
+    }),
+  )
 }

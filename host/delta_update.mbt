@@ -58,6 +58,7 @@ pub async fn fetch_delta_reference(
   url : String,
   expected_sha256 : String,
   request_timeout_ms~ : Int32 = 30000,
+  control? : UpdateControl,
 ) -> @ledger.DeltaReference {
   validate_delta_url(url)
   if expected_sha256.length() != 64 ||
@@ -72,7 +73,8 @@ pub async fn fetch_delta_reference(
       raise InvalidInput("metadata pin must be lowercase SHA-256 hex")
     }
   }
-  @async.with_timeout(request_timeout_ms, () => {
+  update_tick(control, LoadingMetadata, 0L, 0L, 0L, false)
+  let reference = @async.with_timeout(request_timeout_ms, () => {
     let (response, client) = @http.get_stream(url, headers={
       "Accept-Encoding": "identity",
     })
@@ -128,6 +130,8 @@ pub async fn fetch_delta_reference(
         "metadata HTTP request failed; check URL/network and retry",
       )
   }
+  update_tick(control, LoadingMetadata, 0L, 0L, 0L, false)
+  reference
 }
 
 ///|
@@ -224,6 +228,7 @@ pub async fn update_from_seed(
   max_scan_bytes? : Int64,
   max_hash_bytes? : Int64,
   checkpoint_blocks~ : Int32 = 1,
+  control? : UpdateControl,
 ) -> DeltaUpdateReport {
   check_checkpoint_blocks(checkpoint_blocks)
   check_scan_limits(max_scan_bytes?, max_hash_bytes?)
@@ -254,6 +259,7 @@ pub async fn update_from_seed(
           max_scan_bytes?,
           max_hash_bytes?,
           checkpoint_blocks~,
+          control?,
         ),
       )
     None => None
@@ -269,6 +275,7 @@ pub async fn update_from_seed(
     request_timeout_ms~,
     auth?,
     checkpoint_blocks~,
+    control?,
   )
 }
 
@@ -284,6 +291,7 @@ async fn finish_delta_update(
   request_timeout_ms~ : Int32,
   auth? : BearerAuth,
   checkpoint_blocks~ : Int32,
+  control? : UpdateControl,
 ) -> DeltaUpdateReport {
   let received = download(
     reference.spec,
@@ -295,12 +303,24 @@ async fn finish_delta_update(
     request_timeout_ms~,
     auth?,
     checkpoint_blocks~,
+    control?,
   )
   let exported = if received.complete && export_to is Some(destination) {
-    export_verified(reference.spec, output, destination)
+    export_verified(reference.spec, output, destination, control?)
     true
   } else {
     false
+  }
+  if received.complete {
+    update_tick(
+      control,
+      Finished,
+      reference.spec.length,
+      reference.spec.length,
+      reference.spec.length,
+      true,
+      check_pause=false,
+    )
   }
   { seed: staged, receive: received, exported, }
 }
@@ -321,6 +341,7 @@ pub async fn update_from_seeds(
   max_scan_bytes? : Int64,
   max_hash_bytes? : Int64,
   checkpoint_blocks~ : Int32 = 1,
+  control? : UpdateControl,
 ) -> DeltaUpdateReport {
   check_checkpoint_blocks(checkpoint_blocks)
   check_scan_limits(max_scan_bytes?, max_hash_bytes?)
@@ -345,6 +366,7 @@ pub async fn update_from_seeds(
     max_scan_bytes?,
     max_hash_bytes?,
     checkpoint_blocks~,
+    control?,
   )
   finish_delta_update(
     reference,
@@ -357,5 +379,6 @@ pub async fn update_from_seeds(
     request_timeout_ms~,
     auth?,
     checkpoint_blocks~,
+    control?,
   )
 }

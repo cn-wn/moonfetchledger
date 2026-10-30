@@ -23,7 +23,7 @@ pub struct Source {
   // private fields
 }
 pub fn Source::new(@moonfetchledger.ObjectSpec, @types.WebdavConfig, String, allow_loopback_auth? : Bool) -> Self raise
-pub async fn Source::receive(Self, String, chunk_size? : Int32, parallel? : Int32, stop_after_blocks? : Int32, on_progress? : async (@host.DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal, checkpoint_blocks? : Int32) -> @host.DownloadReport
+pub async fn Source::receive(Self, String, chunk_size? : Int32, parallel? : Int32, stop_after_blocks? : Int32, on_progress? : async (@host.DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal, checkpoint_blocks? : Int32, control? : @host.UpdateControl) -> @host.DownloadReport
 
 // Type aliases
 

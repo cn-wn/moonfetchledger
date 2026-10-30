@@ -6,6 +6,12 @@ requires script dependency imports in leading `----` frontmatter for clean
 Older Moon executables that do not recognize it cannot run these scripts;
 update the toolchain as a whole rather than suppressing `unfenced_import`.
 
+When switching toolchain distributions in a previously built checkout, run
+`moon clean` before rebuilding. During the October 28 stable validation an existing
+native build encountered a linker-stage compiler crash; a clean build and the complete
+verification workflow subsequently ran successfully. Clearing generated caches
+does not require changing source files or suppressing diagnostics.
+
 ```text
 moon version --all
 moon update

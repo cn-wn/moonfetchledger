@@ -1,7 +1,17 @@
 ///|
 /// Read a bounded, untrusted local announcement. Verification is separate.
-pub async fn load_release(path : String) -> Bytes {
-  read_release_file(path, 16384)
+pub async fn load_release(path : String, control? : UpdateControl) -> Bytes {
+  update_tick(control, LoadingRelease, 0L, 0L, 0L, false)
+  let bytes = read_release_file(path, 16384)
+  update_tick(
+    control,
+    LoadingRelease,
+    bytes.length().to_int64(),
+    bytes.length().to_int64(),
+    0L,
+    false,
+  )
+  bytes
 }
 
 ///|
@@ -48,12 +58,14 @@ pub async fn write_signed_release(
 pub async fn fetch_release(
   url : String,
   request_timeout_ms~ : Int32 = 30000,
+  control? : UpdateControl,
 ) -> Bytes {
   validate_delta_url(url)
   if request_timeout_ms < 1 || request_timeout_ms > 120000 {
     raise InvalidInput("release timeout must be 1..120000 ms")
   }
-  @async.with_timeout(request_timeout_ms, () => {
+  update_tick(control, LoadingRelease, 0L, 0L, 0L, false)
+  let bytes = @async.with_timeout(request_timeout_ms, () => {
     let (response, client) = @http.get_stream(url, headers={
       "Accept-Encoding": "identity",
     })
@@ -100,6 +112,15 @@ pub async fn fetch_release(
         "release HTTP request failed; check origin/network and retry",
       )
   }
+  update_tick(
+    control,
+    LoadingRelease,
+    bytes.length().to_int64(),
+    bytes.length().to_int64(),
+    0L,
+    false,
+  )
+  bytes
 }
 
 ///|
@@ -133,6 +154,7 @@ pub async fn update_signed_release(
   max_scan_bytes? : Int64,
   max_hash_bytes? : Int64,
   checkpoint_blocks~ : Int32 = 1,
+  control? : UpdateControl,
 ) -> SignedUpdateReport {
   check_checkpoint_blocks(checkpoint_blocks)
   check_scan_limits(max_scan_bytes?, max_hash_bytes?)
@@ -245,7 +267,9 @@ pub async fn update_signed_release(
       )
     }
   }
+  update_tick(control, Authorizing, 0L, 0L, 0L, resuming)
   with_release_state(state, trust, signed_release, now, action=approved => {
+    update_tick(control, LoadingMetadata, 0L, 0L, 0L, resuming)
     let reference = match metadata_file {
       Some(path) => load_delta_reference(path, approved.release.metadata_sha256)
       None =>
@@ -255,6 +279,7 @@ pub async fn update_signed_release(
           request_timeout_ms~,
         )
     }
+    update_tick(control, LoadingMetadata, 0L, 0L, 0L, resuming)
     let update = if resuming {
       update_from_seed(
         reference,
@@ -267,6 +292,7 @@ pub async fn update_signed_release(
         request_timeout_ms~,
         auth?,
         checkpoint_blocks~,
+        control?,
       )
     } else {
       update_from_seeds(
@@ -282,6 +308,7 @@ pub async fn update_signed_release(
         max_scan_bytes?,
         max_hash_bytes?,
         checkpoint_blocks~,
+        control?,
       )
     }
     {

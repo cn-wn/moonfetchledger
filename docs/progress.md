@@ -1,5 +1,9 @@
 # Download progress after saved coverage
 
+For phase counters and cancellation across release/metadata loading, seed scans,
+reuse, download, verification and export, use [UpdateControl](update-control.md).
+This page describes the existing download-only observer, which is still supported.
+
 An updater can attach an asynchronous observer to the native adapter:
 
 ```moonbit
@@ -18,7 +22,8 @@ Use the generated host interface for imports. Existing calls can omit
   new requests. Confirmed bytes include retained blocks; downloaded blocks is zero.
 - `BlockCommitted(range)`: after write/sync, readback and checkpoint save. The
   half-open range is that block, including a possible short final block. Counts
-  increase in completion order, which need not be offset order.
+  never decrease in completion order, which need not be offset order. With
+  checkpoint batching, several block events share the same saved snapshot.
 - `Paused`: the block budget was reached with incomplete coverage.
 - `Complete`: coverage is complete and the full stored SHA-256 passed. A block
   event with confirmed bytes equal to total is insufficient to activate an artifact.

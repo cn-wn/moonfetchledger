@@ -98,6 +98,9 @@ async fn run() -> Unit {
     }
     if flag == "--help" {
       println(
+        "--progress-json emits phase progress. --cancel-file PATH cooperatively pauses when that marker exists; remove the marker before retry/resume. Existing accepted release versions are retained.",
+      )
+      println(
         "--checkpoint-blocks 1..1024 batches synced checkpoints; default 1. A pending batch can be repeated after failure.",
       )
       println(
@@ -116,6 +119,13 @@ async fn run() -> Unit {
         "Private artifacts: --bearer-env NAME --artifact-url EXACT_EXPECTED_URL; credentials are never sent to announcement/metadata URLs. --allow-loopback-auth is only for explicit 127.0.0.1 HTTP tests.",
       )
       return
+    }
+    if flag == "--progress-json" {
+      if values.contains(flag) {
+        fail("duplicate --progress-json")
+      }
+      values[flag] = "true"
+      continue i + 1
     }
     if ["--sign", "--init-state", "--recover-state"].contains(flag) {
       if mode != "update" {
@@ -151,7 +161,7 @@ async fn run() -> Unit {
         "--state", "--minimum-version", "--release", "--release-url", "--seed", "--output",
         "--metadata", "--export-to", "--parallel", "--stop-after-blocks", "--max-attempts",
         "--request-timeout-ms", "--bearer-env", "--artifact-url", "--max-scan-bytes",
-        "--max-hash-bytes", "--checkpoint-blocks",
+        "--max-hash-bytes", "--checkpoint-blocks", "--cancel-file",
       ].contains(flag) ||
       i + 1 >= args.length() ||
       values.contains(flag) {
@@ -175,6 +185,7 @@ async fn run() -> Unit {
       "--release", "--release-url", "--seed", "--output", "--metadata", "--export-to",
       "--parallel", "--stop-after-blocks", "--max-attempts", "--request-timeout-ms",
       "--bearer-env", "--artifact-url", "--max-scan-bytes", "--max-hash-bytes", "--checkpoint-blocks",
+      "--cancel-file", "--progress-json",
     ]
   }
   for key in values.keys() {
@@ -267,12 +278,14 @@ async fn run() -> Unit {
     report("state-recovered", [trust.key_sha256])
     return
   }
+  let control = command_control(values)
   let bytes = match values.get("--release") {
-    Some(path) => @host.load_release(path)
+    Some(path) => @host.load_release(path, control?)
     None =>
       @host.fetch_release(
         required(values, "--release-url"),
         request_timeout_ms=timeout,
+        control?,
       )
   }
   let result = @host.update_signed_release(
@@ -293,6 +306,7 @@ async fn run() -> Unit {
     max_scan_bytes?,
     max_hash_bytes?,
     checkpoint_blocks~,
+    control?,
   )
   report(if result.update.receive.complete { "complete" } else { "paused" }, [
     result.version.to_string(),
@@ -308,9 +322,33 @@ async fn run() -> Unit {
 ///|
 async fn main {
   run() catch {
+    @host.UpdatePaused(_, _) => ()
     error =>
       fail(
         "signed release operation failed; retain state/staging and correct the cause: \{Repr(error)}",
       )
   }
+}
+
+///|
+fn command_control(values : Map[String, String]) -> @host.UpdateControl? raise {
+  let verbose = values.contains("--progress-json")
+  let marker = values.get("--cancel-file")
+  if marker is Some(path) && path.is_empty() {
+    fail("--cancel-file requires a nonempty path")
+  }
+  if !verbose && marker is None {
+    return None
+  }
+  let signal = @ledger.PauseSignal::new()
+  Some(
+    @host.UpdateControl::new(pause_signal=signal, on_progress=p => {
+      if verbose || p.paused {
+        println(p.to_json().stringify())
+      }
+      if marker is Some(path) && @fs.exists(path) {
+        signal.request_pause()
+      }
+    }),
+  )
 }

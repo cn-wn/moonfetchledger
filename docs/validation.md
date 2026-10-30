@@ -1,4 +1,29 @@
-# Validation record — 2026-10-26
+# Validation record — 2026-10-31
+
+Full-update control and checkpoint batching were verified using isolated official
+Linux moon/moonrun 0.1.20261028 and moonc v0.10.18+6c83a7f62; all three binary
+hashes matched the official latest SHA-256 list. After clearing the older
+toolchain's build cache, the complete `scripts/verify.mbtx` workflow passed on a
+byte-identical 210-file source snapshot: formatting/interface drift checks,
+strict four-target compilation, 51 tests on each of wasm/wasm-gc/JavaScript and
+147 actual native tests, all real-data/CLI/independent-consumer examples, seven
+1-MiB HTTP workload cases and six Linux process/storage fault cases.
+
+The 876-small-block USGS example observed 876 saved coverage groups with the
+default versus 14 with batches of 64; final checkpoint/artifact bytes and verified
+exports were identical. This is a save-count result, not a throughput claim.
+Actual HTTP CLI cancellation preserved exactly 8192 saved bytes and resumed in a
+new process. Export readback cancellation removed its owned temporary and resumed
+to exact delivery without artifact GETs. Signed metadata cancellation retained
+the accepted version floor. Empty inputs, mid-second-seed scan cancellation,
+observer errors and a final observer pause were also exercised.
+
+Reproduction and boundary details: [update control](update-control.md),
+[checkpoint batching](checkpoint-batching.md), and [fault matrix](fault-matrix.md).
+Local validation here is Linux execution; the CI matrix independently runs the
+same verification on Linux, macOS and Windows. No package publication is needed.
+
+## Earlier validation — 2026-10-26
 
 Scanner-probe revision: current stable Linux strict all-target checks passed,
 with 51 actual tests on each of wasm/wasm-gc/JavaScript and 136 actual native

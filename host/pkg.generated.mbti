@@ -16,23 +16,23 @@ pub async fn audit(@moonfetchledger.ObjectSpec, String) -> AuditReport
 
 pub async fn audit_with_reference(@moonfetchledger.BlockReference, String) -> AuditReport
 
-pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int32, parallel? : Int32, stop_after_blocks? : Int32, max_attempts? : Int32, retry_delay_ms? : Int32, request_timeout_ms? : Int32, on_progress? : async (DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal, auth? : BearerAuth, checkpoint_blocks? : Int32) -> DownloadReport
+pub async fn download(@moonfetchledger.ObjectSpec, String, chunk_size? : Int32, parallel? : Int32, stop_after_blocks? : Int32, max_attempts? : Int32, retry_delay_ms? : Int32, request_timeout_ms? : Int32, on_progress? : async (DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal, auth? : BearerAuth, checkpoint_blocks? : Int32, control? : UpdateControl) -> DownloadReport
 
-pub async fn export_verified(@moonfetchledger.ObjectSpec, String, String) -> Unit
+pub async fn export_verified(@moonfetchledger.ObjectSpec, String, String, control? : UpdateControl) -> Unit
 
-pub async fn fetch_delta_reference(String, String, request_timeout_ms? : Int32) -> @moonfetchledger.DeltaReference
+pub async fn fetch_delta_reference(String, String, request_timeout_ms? : Int32, control? : UpdateControl) -> @moonfetchledger.DeltaReference
 
-pub async fn fetch_release(String, request_timeout_ms? : Int32) -> Bytes
+pub async fn fetch_release(String, request_timeout_ms? : Int32, control? : UpdateControl) -> Bytes
 
 pub async fn initialize_release_state(String, @release.ReleaseTrust) -> Unit
 
 pub async fn load_block_reference(@moonfetchledger.ObjectSpec, String, String) -> @moonfetchledger.BlockReference
 
-pub async fn load_delta_reference(String, String) -> @moonfetchledger.DeltaReference
+pub async fn load_delta_reference(String, String, control? : UpdateControl) -> @moonfetchledger.DeltaReference
 
 pub async fn load_manifest(String, String) -> @moonfetchledger.ObjectSpec
 
-pub async fn load_release(String) -> Bytes
+pub async fn load_release(String, control? : UpdateControl) -> Bytes
 
 pub async fn load_release_trust(String, String, String, minimum_version? : Int64) -> @release.ReleaseTrust
 
@@ -40,7 +40,7 @@ pub async fn preview_seed(@moonfetchledger.DeltaReference, String, max_scan_byte
 
 pub async fn preview_seeds(@moonfetchledger.DeltaReference, Array[String], max_scan_bytes? : Int64, max_hash_bytes? : Int64) -> @moonfetchledger.SeedPoolPlan
 
-pub async fn receive_from(@moonfetchledger.ObjectSpec, String, fetch_range~ : async (@moonfetchledger.ByteRange) -> ReceivedBlock, chunk_size? : Int32, parallel? : Int32, stop_after_blocks? : Int32, on_progress? : async (DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal, checkpoint_blocks? : Int32) -> DownloadReport
+pub async fn receive_from(@moonfetchledger.ObjectSpec, String, fetch_range~ : async (@moonfetchledger.ByteRange) -> ReceivedBlock, chunk_size? : Int32, parallel? : Int32, stop_after_blocks? : Int32, on_progress? : async (DownloadProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal, checkpoint_blocks? : Int32, control? : UpdateControl) -> DownloadReport
 
 pub async fn recover_checkpoint(@moonfetchledger.ObjectSpec, String) -> AuditReport
 
@@ -48,15 +48,15 @@ pub async fn recover_release_state(String, @release.ReleaseTrust) -> Unit
 
 pub async fn repair_from_local(@moonfetchledger.ObjectSpec, String, String, stop_after_blocks? : Int32, on_progress? : async (LocalRepairProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> LocalRepairReport
 
-pub async fn reuse_from_seed(@moonfetchledger.DeltaReference, String, String, max_scan_bytes? : Int64, max_hash_bytes? : Int64, checkpoint_blocks? : Int32) -> SeedReuseReport
+pub async fn reuse_from_seed(@moonfetchledger.DeltaReference, String, String, max_scan_bytes? : Int64, max_hash_bytes? : Int64, checkpoint_blocks? : Int32, control? : UpdateControl) -> SeedReuseReport
 
-pub async fn reuse_from_seeds(@moonfetchledger.DeltaReference, Array[String], String, max_scan_bytes? : Int64, max_hash_bytes? : Int64, checkpoint_blocks? : Int32) -> SeedReuseReport
+pub async fn reuse_from_seeds(@moonfetchledger.DeltaReference, Array[String], String, max_scan_bytes? : Int64, max_hash_bytes? : Int64, checkpoint_blocks? : Int32, control? : UpdateControl) -> SeedReuseReport
 
-pub async fn update_from_seed(@moonfetchledger.DeltaReference, String, seed? : String, resuming? : Bool, export_to? : String, parallel? : Int32, stop_after_blocks? : Int32, max_attempts? : Int32, request_timeout_ms? : Int32, auth? : BearerAuth, max_scan_bytes? : Int64, max_hash_bytes? : Int64, checkpoint_blocks? : Int32) -> DeltaUpdateReport
+pub async fn update_from_seed(@moonfetchledger.DeltaReference, String, seed? : String, resuming? : Bool, export_to? : String, parallel? : Int32, stop_after_blocks? : Int32, max_attempts? : Int32, request_timeout_ms? : Int32, auth? : BearerAuth, max_scan_bytes? : Int64, max_hash_bytes? : Int64, checkpoint_blocks? : Int32, control? : UpdateControl) -> DeltaUpdateReport
 
-pub async fn update_from_seeds(@moonfetchledger.DeltaReference, Array[String], String, export_to? : String, parallel? : Int32, stop_after_blocks? : Int32, max_attempts? : Int32, request_timeout_ms? : Int32, auth? : BearerAuth, max_scan_bytes? : Int64, max_hash_bytes? : Int64, checkpoint_blocks? : Int32) -> DeltaUpdateReport
+pub async fn update_from_seeds(@moonfetchledger.DeltaReference, Array[String], String, export_to? : String, parallel? : Int32, stop_after_blocks? : Int32, max_attempts? : Int32, request_timeout_ms? : Int32, auth? : BearerAuth, max_scan_bytes? : Int64, max_hash_bytes? : Int64, checkpoint_blocks? : Int32, control? : UpdateControl) -> DeltaUpdateReport
 
-pub async fn update_signed_release(Bytes, @release.ReleaseTrust, String, String, now~ : Int64, metadata_file? : String, seed? : String, seeds? : Array[String], resuming? : Bool, export_to? : String, parallel? : Int32, stop_after_blocks? : Int32, max_attempts? : Int32, request_timeout_ms? : Int32, auth? : BearerAuth, max_scan_bytes? : Int64, max_hash_bytes? : Int64, checkpoint_blocks? : Int32) -> SignedUpdateReport
+pub async fn update_signed_release(Bytes, @release.ReleaseTrust, String, String, now~ : Int64, metadata_file? : String, seed? : String, seeds? : Array[String], resuming? : Bool, export_to? : String, parallel? : Int32, stop_after_blocks? : Int32, max_attempts? : Int32, request_timeout_ms? : Int32, auth? : BearerAuth, max_scan_bytes? : Int64, max_hash_bytes? : Int64, checkpoint_blocks? : Int32, control? : UpdateControl) -> SignedUpdateReport
 
 pub async fn[T] with_release_state(String, @release.ReleaseTrust, Bytes, Int64, action~ : async (@release.ApprovedRelease) -> T) -> T
 
@@ -75,6 +75,7 @@ pub suberror HostError {
   CheckpointTooLarge
   OutputLocked
   RetryExhausted(@moonfetchledger.ByteRange, Int32, String)
+  UpdatePaused(UpdatePhase, Bool)
 } derive(@debug.Debug)
 pub fn HostError::to_repr(Self) -> @debug.Repr
 
@@ -175,6 +176,41 @@ pub struct SignedUpdateReport {
   payload_sha256 : String
   update : DeltaUpdateReport
 }
+
+pub struct UpdateControl {
+  // private fields
+}
+pub fn UpdateControl::is_pause_requested(Self) -> Bool
+pub fn UpdateControl::new(on_progress? : async (UpdateProgress) -> Unit, pause_signal? : @moonfetchledger.PauseSignal) -> Self
+pub fn UpdateControl::request_pause(Self) -> Unit
+
+pub(all) enum UpdatePhase {
+  LoadingRelease
+  Authorizing
+  LoadingMetadata
+  Scanning
+  Reusing
+  Recovering
+  Downloading
+  Verifying
+  Exporting
+  CheckingExport
+  Finished
+} derive(Eq, @debug.Debug)
+pub fn UpdatePhase::equal(Self, Self) -> Bool
+pub fn UpdatePhase::not_equal(Self, Self) -> Bool
+pub fn UpdatePhase::to_repr(Self) -> @debug.Repr
+
+pub struct UpdateProgress {
+  phase : UpdatePhase
+  processed_bytes : Int64
+  total_bytes : Int64
+  confirmed_bytes : Int64
+  resumable : Bool
+  paused : Bool
+} derive(@debug.Debug)
+pub fn UpdateProgress::to_json(Self) -> Json
+pub fn UpdateProgress::to_repr(Self) -> @debug.Repr
 
 // Type aliases
 

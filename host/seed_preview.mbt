@@ -5,6 +5,7 @@ async fn scan_seed_file(
   source : @fs.File,
   max_scan_bytes? : Int64,
   max_hash_bytes? : Int64,
+  on_scanned? : async (Int64) -> Unit,
 ) -> @ledger.SeedPlan {
   check_scan_limits(max_scan_bytes?, max_hash_bytes?)
   if source.kind() != Regular {
@@ -19,6 +20,9 @@ async fn scan_seed_file(
   let scanner = reference.scanner()
   let mut offset = 0L
   let mut remaining = max_hash_bytes.unwrap_or(9223372036854775807L)
+  if on_scanned is Some(notify) {
+    notify(0L)
+  }
   while offset < size {
     let length = (size - offset).min(65536L).to_int()
     let step = scanner.push_bounded(
@@ -32,6 +36,9 @@ async fn scan_seed_file(
     }
     remaining -= step.hashed_bytes
     offset += length.to_int64()
+    if on_scanned is Some(notify) {
+      notify(offset)
+    }
   }
   if source.size() != size {
     raise InvalidInput(

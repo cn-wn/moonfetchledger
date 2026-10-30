@@ -55,7 +55,9 @@ pub async fn write_delta_reference(
 pub async fn load_delta_reference(
   path : String,
   expected_sha256 : String,
+  control? : UpdateControl,
 ) -> @ledger.DeltaReference {
+  update_tick(control, LoadingMetadata, 0L, 0L, 0L, false)
   if path.is_empty() || @fs.kind(path) != Regular {
     raise InvalidInput("delta metadata must be a regular file")
   }
@@ -72,7 +74,9 @@ pub async fn load_delta_reference(
   if file.read_at(probe, position=size) != 0 || file.size() != size {
     raise InvalidInput("delta metadata length changed while reading")
   }
-  @ledger.DeltaReference::from_bytes(bytes, expected_sha256)
+  let reference = @ledger.DeltaReference::from_bytes(bytes, expected_sha256)
+  update_tick(control, LoadingMetadata, size, size, 0L, false)
+  reference
 }
 
 ///|
@@ -97,6 +101,7 @@ pub async fn reuse_from_seed(
   max_scan_bytes? : Int64,
   max_hash_bytes? : Int64,
   checkpoint_blocks~ : Int32 = 1,
+  control? : UpdateControl,
 ) -> SeedReuseReport {
   reuse_from_seeds(
     reference,
@@ -105,5 +110,6 @@ pub async fn reuse_from_seed(
     max_scan_bytes?,
     max_hash_bytes?,
     checkpoint_blocks~,
+    control?,
   )
 }

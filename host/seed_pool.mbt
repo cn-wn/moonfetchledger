@@ -46,6 +46,7 @@ async fn scan_seed_pool(
   files : Array[@fs.File],
   max_scan_bytes? : Int64,
   max_hash_bytes? : Int64,
+  control? : UpdateControl,
 ) -> @ledger.SeedPoolPlan {
   check_scan_limits(max_scan_bytes?, max_hash_bytes?)
   let pool = @ledger.SeedPool::new(reference)
@@ -63,15 +64,21 @@ async fn scan_seed_pool(
     raise InvalidInput("seed pool exceeds total scan byte limit; retain inputs")
   }
   let mut hashed = 0L
+  let mut scanned = 0L
+  update_tick(control, Scanning, 0L, total, 0L, false)
   for i, file in files {
     let plan = scan_seed_file(
       reference,
       file,
       max_scan_bytes=sizes[i],
       max_hash_bytes?=max_hash_bytes.map(n => n - hashed),
+      on_scanned=n => {
+        update_tick(control, Scanning, scanned + n, total, 0L, false)
+      },
     )
     pool.add(plan)
     hashed += plan.hashed_bytes
+    scanned += sizes[i]
   }
   for i, file in files {
     if file.size() != sizes[i] {
@@ -107,6 +114,7 @@ pub async fn reuse_from_seeds(
   max_scan_bytes? : Int64,
   max_hash_bytes? : Int64,
   checkpoint_blocks~ : Int32 = 1,
+  control? : UpdateControl,
 ) -> SeedReuseReport {
   check_checkpoint_blocks(checkpoint_blocks)
   check_scan_limits(max_scan_bytes?, max_hash_bytes?)
@@ -139,6 +147,7 @@ pub async fn reuse_from_seeds(
       files,
       max_scan_bytes?,
       max_hash_bytes?,
+      control?,
     )
     let lock = @fs.open(
       output + ".mfl.lock",
@@ -168,7 +177,11 @@ pub async fn reuse_from_seeds(
       checkpoint_blocks,
     )
     let matches = plan.matches()
+    update_tick(control, Reusing, 0L, plan.reused_bytes, 0L, true)
     for record in matches {
+      if control is Some(c) && c.is_pause_requested() {
+        break
+      }
       let source = files[record.seed_index]
       let lease = session
         .reserve_range(record.target)
@@ -185,15 +198,50 @@ pub async fn reuse_from_seeds(
           "selected seed changed length; retain partial staging",
         )
       }
-      ignore(batch.append(prepared, record.target, bytes))
+      let saved = batch.append(prepared, record.target, bytes)
+      if !saved.is_empty() {
+        update_tick(
+          control,
+          Reusing,
+          session.confirmed_bytes(),
+          plan.reused_bytes,
+          session.confirmed_bytes(),
+          true,
+          check_pause=false,
+        )
+      }
     }
     ignore(batch.flush())
+    update_tick(
+      control,
+      Reusing,
+      session.confirmed_bytes(),
+      plan.reused_bytes,
+      session.confirmed_bytes(),
+      true,
+    )
     let complete = session.confirmed_bytes() == reference.spec.length
     if complete {
       let verifier = session.verifier()
+      update_tick(
+        control,
+        Verifying,
+        0L,
+        reference.spec.length,
+        session.confirmed_bytes(),
+        true,
+      )
       while verifier.next_range() is Some(r) {
         verifier.push(
           target.read_exactly_at(r.length().to_int(), position=r.start),
+        )
+        update_tick(
+          control,
+          Verifying,
+          r.end,
+          reference.spec.length,
+          session.confirmed_bytes(),
+          true,
         )
       }
       verifier.finish()

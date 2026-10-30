@@ -383,6 +383,48 @@ async fn main {
       ],
     )
     assert_eq(@fs.read_file(dir + "/ready-offline").binary(), v2)
+    let marker = dir + "/cancel"
+    let controlled_state = dir + "/controlled-state"
+    let controlled = common.map(arg => {
+      if arg == state {
+        controlled_state
+      } else {
+        arg
+      }
+    })
+    // Provision another legitimate client state with the SAME pinned key.
+    let initialize_controlled = controlled.copy()
+    initialize_controlled.push("--init-state")
+    invoke("release", initialize_controlled).check()
+    let original_state = @fs.read_file(controlled_state).binary()
+    @fs.write_file(marker, b"pause")
+    controlled.append([
+      "--release",
+      dir + "/v2",
+      "--metadata",
+      metadata_path,
+      "--seed",
+      dir + "/publisher",
+      "--output",
+      dir + "/controlled",
+      "--export-to",
+      dir + "/controlled-ready",
+      "--checkpoint-blocks",
+      "2",
+      "--progress-json",
+      "--cancel-file",
+      marker,
+    ])
+    let cancelled = invoke("release", controlled)
+    cancelled.check()
+    assert_true(cancelled.stdout().contains("\"release\",\"paused\""))
+    assert_eq(@fs.read_file(controlled_state).binary(), original_state)
+    assert_true(@fs.exists(marker) && !@fs.exists(dir + "/controlled"))
+    @fs.remove(marker)
+    let controlled_done = invoke("release", controlled)
+    controlled_done.check()
+    assert_true(controlled_done.stdout().contains("\"finished\",\"running\""))
+    assert_eq(@fs.read_file(dir + "/controlled-ready").binary(), v2)
     let pending = @fs.read_file(state).binary()
     @fs.write_file(state + ".next", pending)
     let pending_resume = common.copy()

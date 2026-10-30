@@ -5,6 +5,7 @@ pub suberror HostError {
   CheckpointTooLarge
   OutputLocked
   RetryExhausted(@ledger.ByteRange, Int32, String)
+  UpdatePaused(UpdatePhase, Bool)
 } derive(Debug)
 
 ///|
@@ -34,6 +35,7 @@ async fn receive(
   mutex : @async.Mutex,
   fetch_range : async (@ledger.ByteRange) -> ReceivedBlock,
   progress : ProgressTracker,
+  control : UpdateControl?,
 ) -> Unit {
   let block = fetch_range(lease.range)
   let bytes = block.bytes
@@ -52,6 +54,17 @@ async fn receive(
   progress.downloaded += saved.length()
   for range in saved {
     progress.notify(session, BlockCommitted(range))
+  }
+  if !saved.is_empty() {
+    update_tick(
+      control,
+      Downloading,
+      session.confirmed_bytes(),
+      session.spec.length,
+      session.confirmed_bytes(),
+      true,
+      check_pause=false,
+    )
   }
 }
 
@@ -78,6 +91,7 @@ pub async fn receive_from(
   on_progress? : async (DownloadProgress) -> Unit,
   pause_signal? : @ledger.PauseSignal,
   checkpoint_blocks~ : Int32 = 1,
+  control? : UpdateControl,
 ) -> DownloadReport {
   check_checkpoint_blocks(checkpoint_blocks)
   if output.is_empty() ||
@@ -97,6 +111,7 @@ pub async fn receive_from(
       "checkpoint temporary exists; retain it and use recover_checkpoint/--recover-checkpoint for a saved .next candidate; inspect .recovering separately",
     )
   }
+  update_tick(control, Recovering, 0L, spec.length, 0L, @fs.exists(checkpoint))
   let lock = @fs.open(
     output + ".mfl.lock",
     mode=ReadWrite,
@@ -139,6 +154,7 @@ pub async fn receive_from(
     if !session.reconcile_block(range, readback) {
       invalidated.push(range)
     }
+    update_tick(control, Recovering, range.end, spec.length, 0L, true)
   }
   session.finish_recovery()
   let recovery : @ledger.RecoveryReport = {
@@ -148,17 +164,34 @@ pub async fn receive_from(
   save(session, checkpoint)
   let progress : ProgressTracker = { callback: on_progress, downloaded: 0, }
   progress.notify(session, Recovered)
+  update_tick(
+    control,
+    Recovering,
+    spec.length,
+    spec.length,
+    session.confirmed_bytes(),
+    true,
+  )
+  update_tick(
+    control,
+    Downloading,
+    session.confirmed_bytes(),
+    spec.length,
+    session.confirmed_bytes(),
+    true,
+  )
   let mutex = @async.Mutex::Mutex()
   let batch = CheckpointBatch::new(session, file, checkpoint, checkpoint_blocks)
   let mut downloaded = 0
   let budget = stop_after_blocks.unwrap_or(100000)
   while downloaded < budget &&
-        !(pause_signal is Some(signal) && signal.is_requested()) {
+        !(pause_signal is Some(signal) && signal.is_requested()) &&
+        !(control is Some(c) && c.is_pause_requested()) {
     let jobs : Array[async () -> Unit] = []
     for _ in 0..<parallel.min(budget - downloaded) {
       if session.reserve_missing() is Some(lease) {
         jobs.push(() => {
-          receive(session, lease, batch, mutex, fetch_range, progress)
+          receive(session, lease, batch, mutex, fetch_range, progress, control)
         })
       }
     }
@@ -173,12 +206,40 @@ pub async fn receive_from(
   for range in saved {
     progress.notify(session, BlockCommitted(range))
   }
+  if !saved.is_empty() {
+    update_tick(
+      control,
+      Downloading,
+      session.confirmed_bytes(),
+      spec.length,
+      session.confirmed_bytes(),
+      true,
+      check_pause=false,
+    )
+  }
+  update_pause(control, Downloading, true)
   let complete = session.confirmed_bytes() == spec.length
   if complete {
     let verifier = session.verifier()
+    update_tick(
+      control,
+      Verifying,
+      0L,
+      spec.length,
+      session.confirmed_bytes(),
+      true,
+    )
     while verifier.next_range() is Some(range) {
       verifier.push(
         file.read_exactly_at(range.length().to_int(), position=range.start),
+      )
+      update_tick(
+        control,
+        Verifying,
+        range.end,
+        spec.length,
+        session.confirmed_bytes(),
+        true,
       )
     }
     verifier.finish()
