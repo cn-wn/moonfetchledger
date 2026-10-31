@@ -3,6 +3,19 @@ on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
 jobs:
+  ordinary-filesystem-faults:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable MoonBit
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - name: Initialize public package registry
+        run: moon update
+      - name: Test ordinary ext4 ENOSPC and new-process recovery
+        run: moon run --deny-warn scripts/filesystem_faults.mbtx
   verify:
     timeout-minutes: 10
     strategy:

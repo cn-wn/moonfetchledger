@@ -86,7 +86,8 @@ async fn main {
   if args.length() != 3 ||
     ![
       "saved", "pending", "resume", "recover-pending", "checkpoint-fail", "disk-full",
-      "write-refusal", "batched", "resume-batched",
+      "write-refusal", "batched", "resume-batched", "fs-data-full", "fs-checkpoint-full",
+      "fs-export-full", "fs-resume-data", "fs-resume-checkpoint", "fs-resume-export",
     ].contains(args[1]) {
     fail("fault-worker MODE OWNED_FIXTURE_DIRECTORY")
   }
@@ -108,6 +109,11 @@ async fn main {
     @ledger.digest(data),
   )
   let output = dir + "/staging"
+  if mode.has_prefix("fs-") {
+    filesystem_fault(mode, dir, spec, data)
+    assert_eq(@fs.read_file(dir + "/publisher").binary(), data)
+    return
+  }
   if mode == "batched" {
     ignore(
       @host.receive_from(

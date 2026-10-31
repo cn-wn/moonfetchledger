@@ -35,3 +35,30 @@ requires /proc/self/oom_score_adj. There is no fake cross-platform ENOSPC succes
 and no claim to have exhausted a regular filesystem or tested power loss.
 The parent cancels only process handles it created and recursively removes only
 its newly owned temporary directory. No production failure hooks are added.
+
+## Ordinary filesystem ENOSPC and recovery (Linux)
+
+```text
+moon run --deny-warn scripts/filesystem_faults.mbtx
+```
+
+This separate integration gate requires Linux, `mkfs.ext4`, `mount`, `umount`,
+`truncate`, and root or noninteractive sudo. CI runs it in an Ubuntu job. It
+creates a private 16 MiB image, mounts ext4 without a journal or delayed
+allocation, and fills only that image with synced ordinary-file writes until
+the kernel returns ENOSPC. It does not fill the host filesystem. All output,
+checkpoint and export paths are ordinary files on the image.
+
+| Failure boundary | Recovery after removing only the owned filler |
+| --- | --- |
+| First content write | Prior empty checkpoint remains; a new process retains 0 bytes and receives seven blocks. |
+| Replacing the checkpoint during reconciliation | No additional source fetch; old checkpoint and first 4096 bytes remain. A new process retains that block and receives six. |
+| Exporting verified staging | Failed private export is removed, destination absent, staging and checkpoint unchanged. A new process retains all 28008 bytes and exports with zero new reads. |
+
+Every failure must be the actual Linux OSError errno 28. Each fresh receiver
+process compares the full USGS bytes and SHA-256, checks the publisher was not
+modified, and emits an MFLFILESYSTEM1 receipt with retained bytes and new reads.
+The driver unmounts before removing its owned directory; an unmount failure
+retains the fixture for inspection. This establishes these ENOSPC boundaries,
+not arbitrary I/O errors, inode exhaustion, filesystem corruption or power-loss
+durability. The existing portable process-failure gate remains separate.

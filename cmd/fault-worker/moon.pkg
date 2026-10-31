@@ -3,6 +3,7 @@ import {
   "cn-wn/moonfetchledger/host",
   "moonbitlang/async",
   "moonbitlang/async/fs",
+  "moonbitlang/async/os_error",
   "moonbitlang/core/env",
 }
 

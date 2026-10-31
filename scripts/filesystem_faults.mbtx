@@ -1,0 +1,114 @@
+----
+import {
+  "moonbitlang/async@0.22.4",
+  "moonbitlang/async@0.22.4/fs",
+  "moonbitlang/async@0.22.4/shell",
+  "moonbitlang/core/json",
+}
+----
+
+///|
+fn privileged(
+  program : String,
+  args : Array[String],
+  uid : String,
+) -> @shell.Cmd {
+  if uid == "0" {
+    @shell.Cmd(program, args)
+  } else {
+    let command = ["-n", program]
+    command.append(args)
+    @shell.Cmd("sudo", command)
+  }
+}
+
+///|
+async fn main {
+  let identity = @shell.Cmd("id", ["-u"]).output()
+  identity.check()
+  let uid = identity.stdout().trim().to_owned()
+  let kernel = @shell.Cmd("uname", ["-s"]).output()
+  kernel.check()
+  assert_eq(kernel.stdout().trim(), "Linux")
+  @shell.Cmd("moon", [
+    "build", "--release", "--target", "native", "--deny-warn", "-j", "2", "cmd/fault-worker",
+  ]).run(timeout_ms=180000)
+  let binary = @fs.realpath(
+    "_build/native/release/build/cmd/fault-worker/fault-worker.exe",
+  )
+  let fixture = @fs.read_file("fixtures/earthquakes-2024-01-01.csv").binary()
+  let dir = @fs.tmpdir(prefix="mfl-ordinary-filesystem-")
+  let volume = dir + "/volume"
+  let image = dir + "/owned-ext4.img"
+  let mut mounted = false
+  defer {
+    if mounted {
+      let result = privileged("umount", [volume], uid).output() catch {
+        e =>
+          fail("cannot unmount owned fixture; retained at \{dir}: \{Repr(e)}")
+      }
+      result.check()
+      mounted = false
+    }
+    if !mounted {
+      @fs.rmdir(dir, recursive=true)
+    }
+  }
+  @fs.mkdir(volume)
+  @fs.write_file(dir + "/owner", b"MFLFAULT-DIRECTORY1", create_mode=CreateNew)
+  @fs.write_file(dir + "/publisher", fixture, create_mode=CreateNew)
+  for
+    (fault, recovery, retained, reads) in [
+      ("fs-data-full", "fs-resume-data", "0", "7"),
+      ("fs-checkpoint-full", "fs-resume-checkpoint", "4096", "6"),
+      ("fs-export-full", "fs-resume-export", "28008", "0"),
+    ] {
+    assert_true(@fs.readdir(volume).is_empty())
+    @fs.write_file(image, b"", create_mode=CreateNew)
+    @shell.Cmd("truncate", ["-s", "16M", image]).run()
+    @shell.Cmd("mkfs.ext4", ["-q", "-F", "-m", "0", "-O", "^has_journal", image]).run()
+    privileged(
+      "mount",
+      ["-o", "loop,nodev,nosuid,noexec,nodelalloc", image, volume],
+      uid,
+    ).run()
+    mounted = true
+    privileged("chown", [uid, volume], uid).run()
+    @fs.write_file(
+      volume + "/owner",
+      b"MFL-EXT4-FIXTURE1",
+      create_mode=CreateNew,
+    )
+    @shell.Cmd(binary, [fault, dir]).run(timeout_ms=30000)
+    // Free only the filler owned by this case, then restore in a NEW process.
+    @fs.remove(volume + "/filler")
+    let restored = @shell.Cmd(binary, [recovery, dir]).output(timeout_ms=30000)
+    restored.check()
+    guard @json.parse(restored.stdout().trim())
+      is [
+        String("MFLFILESYSTEM1"),
+        String(mode),
+        String(bytes),
+        String(blocks),
+        String(hash),
+      ] &&
+      mode == recovery &&
+      bytes == retained &&
+      blocks == reads &&
+      hash == "dca55780e807e6b6dc5dafe53a621bf99929681551ab85bb4a27f5142e208042" else {
+      fail(
+        "ordinary filesystem recovery did not prove expected retained coverage",
+      )
+    }
+    assert_eq(@fs.read_file(dir + "/publisher").binary(), fixture)
+    assert_eq(@fs.read_file(volume + "/ready").binary(), fixture)
+    println(restored.stdout().trim())
+    privileged("umount", [volume], uid).run()
+    mounted = false
+    @fs.remove(image)
+    @fs.remove(dir + "/saved")
+  }
+  println(
+    "ordinary ext4 ENOSPC verified at content/checkpoint/export boundaries; new-process recovery and exact delivery; owned image unmounted and removed",
+  )
+}
