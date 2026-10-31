@@ -1,48 +1,146 @@
 # MoonFetchLedger
 
-[Full update progress and cancellation](docs/update-control.md) covers metadata,
-seed scanning/reuse, retained-block recovery, download, verification and export,
-with resumable typed pauses and actual-process CLI examples.
-
-[Checkpoint batching](docs/checkpoint-batching.md) reduces synced checkpoint
-replacements for small blocks, with bounded unrecorded work and saved-progress
-semantics; the default remains one block per checkpoint.
-
-[Read-only update previews](docs/update-preview.md) show reusable blocks and
-logical missing bytes before creating staging or downloading artifact content.
-
-[Acceptance and local packaging](docs/acceptance.md) provides exact reproduction
-commands and explicit delivery limits. [Independent consumer](integration/downstream/README.md)
-uses this checkout as a separate workspace dependency; no Mooncakes publication
-or published MoonFetchLedger package is required.
-
-[Measured workloads](docs/stress-matrix.md) compare full download with offset,
-damage, insertion/deletion, reordering and low-reuse seeds using real loopback
-HTTP and source-preservation assertions. Large synthetic inputs are opt-in;
-metrics distinguish missing content, actual body traffic and worker peak RSS.
-The [paired scanner experiment](docs/measurements/probe-comparison-20261026.md)
-records unchanged matching/verification counters alongside local timing samples.
-
-[Process/storage fault tests](docs/fault-matrix.md) terminate owned workers at
-saved-state barriers, verify explicit pending recovery and checkpoint failures,
-and test platform-specific kernel I/O refusal without claiming power-loss safety.
-
-Portable [signed release authorization](docs/signed-releases.md) binds an
-independently pinned publisher key, product/channel, version and expiry to the
-exact delta metadata. It reuses the published MoonBit Ed25519 package; it is
-neither a new crypto implementation nor TUF-compatible metadata.
-The native signed-update CLI combines remote signed announcements, persistent
-version acceptance, cross-version reuse, pause/resume and verified delivery:
-`moon run scripts/signed_update_demo.mbtx` reproduces the complete public-data workflow.
-
 `cn-wn/moonfetchledger` is a MoonBit cross-version file update and integrity
 recovery layer for existing download clients. Its [delta workflow](docs/delta-update.md)
 finds verified target blocks at arbitrary offsets in old files, stages sparse
 coverage, fetches gaps and delivers verified new content while preserving v1.
 It also detects same-size damage and retains valid blocks during selective repair.
-Independently pinned block references also recover valid coverage when a file is
-already damaged and its local checkpoint is missing. See the
-[reproducible difference proof](docs/differentiation-proof.md).
+
+## Install and try
+
+Install the [current stable MoonBit toolchain](https://www.moonbitlang.com/download/)
+and a native C compiler; Windows users need an MSVC developer shell. Node 22 is
+needed when running JavaScript tests. In your MoonBit application, install:
+
+```text
+moon add cn-wn/moonfetchledger@0.1.0
+```
+
+See the [0.1.0 release notes](CHANGELOG.md) for delivered features and limits.
+To run a self-contained example with bundled data:
+
+```text
+git clone https://github.com/cn-wn/moonfetchledger.git MoonFetchLedger
+cd MoonFetchLedger
+moon update
+moon run --target native examples/update-control
+```
+
+The example uses the bundled public-domain USGS data. It reconstructs a file,
+prints phase progress, cancels during export readback, then resumes and verifies
+byte-exact delivery with zero artifact GETs. It cleans up its temporary files.
+For actual HTTP transfer and a new-process resume, run
+`moon run --deny-warn scripts/delta_update_demo.mbtx`.
+
+## Use the library in your application
+
+For registry installation, create a `consumer` directory containing the
+`moon.mod`, `moon.pkg` and `main.mbt` below; no workspace file is needed.
+
+For **local source development**, optionally arrange the checkout and consumer
+with this layout instead:
+
+```text
+workspace/
+  moon.work
+  MoonFetchLedger/
+  consumer/
+    moon.mod
+    moon.pkg
+    main.mbt
+```
+
+Only for local source development, put this in `workspace/moon.work` so the
+dependency resolves to the checkout instead of the registry:
+
+```moonwork
+members = ["MoonFetchLedger", "consumer"]
+```
+
+Put this in `consumer/moon.mod`:
+
+```moonmod
+name = "example/mfl-first-use"
+version = "0.1.0"
+preferred_target = "native"
+
+import {
+  "cn-wn/moonfetchledger@0.1.0",
+  "moonbitlang/async@0.22.4",
+}
+```
+
+Put this in `consumer/moon.pkg`:
+
+```moonpkg
+import {
+  "cn-wn/moonfetchledger/host",
+  "moonbitlang/async",
+  "moonbitlang/core/env",
+}
+
+pkgtype(kind: "executable")
+options(supported_targets: "native")
+```
+
+Put this minimal update program in `consumer/main.mbt`:
+
+```mbt
+///|
+async fn main {
+  let args = @env.args()
+  guard args.length() == 6 else {
+    fail("expected: METADATA TRUSTED_SHA256 OLD_FILE NEW_STAGING NEW_READY")
+  }
+  let reference = @host.load_delta_reference(args[1], args[2])
+  let result = @host.update_from_seed(
+    reference,
+    args[4],
+    seed=args[3],
+    export_to=args[5],
+    checkpoint_blocks=64,
+    control=@host.UpdateControl::new(on_progress=p => {
+      println(p.to_json().stringify())
+    }),
+  )
+  if !result.receive.complete || !result.exported {
+    fail("update incomplete; retain staging and checkpoint for explicit resume")
+  }
+  println("verified and exported")
+}
+```
+
+From `consumer`, run `moon update`, then:
+
+```text
+moon run --target native . -- target.delta TRUSTED_METADATA_SHA256 old.bin staging.bin ready.bin
+```
+
+The publisher supplies `target.delta` and its independently trusted SHA-256.
+It must describe a reachable HTTP(S) artifact with a known length, strong ETag
+and trusted whole-file digest. Choose new staging/ready paths; the old file is
+preserved. [Metadata publication and delivery](docs/delta-update.md) explains how
+to produce these inputs. The checked [independent application](integration/downstream/README.md)
+reproduces a complete signed workflow using the real bundled fixture without
+private infrastructure: `moon run --deny-warn scripts/downstream_demo.mbtx`.
+
+After an interrupted update with a saved session, call `update_from_seed` with
+`resuming=true`, omit `seed`, and retain the same metadata/staging and an unused
+ready path. Use a fresh control. [Progress and cooperative cancellation](docs/update-control.md)
+explains typed pauses and export cleanup. [Checkpoint batching](docs/checkpoint-batching.md)
+explains the unrecorded work that may need repeating after an abrupt failure.
+Use the optional [`on_preview` callback](docs/update-preview.md#decide-and-apply-without-a-second-rolling-scan)
+to inspect or reject a union plan before staging and apply that same scan result.
+`moon run --target native examples/preview-update` demonstrates it on real data.
+
+| Package | Targets | Purpose |
+| --- | --- | --- |
+| `cn-wn/moonfetchledger` | Wasm, Wasm-GC, JS, native | Storage-independent block matching, sessions and verification |
+| `cn-wn/moonfetchledger/release` | Wasm, Wasm-GC, JS, native | Publisher signature and release-policy verification |
+| `cn-wn/moonfetchledger/host` | Native | Filesystem/HTTP update, audit, recovery and export |
+| `cn-wn/moonfetchledger/webdav` | Native | Integration with the existing WebDAV client |
+
+## Integrations and validation
 
 The native [WebDAV integration](docs/webdav.md) extends the published
 [q2316367743/webdav](https://github.com/q2316367743/webdav) client: the upstream
@@ -52,6 +150,20 @@ verified adoption, readback, sparse recovery and final integrity checks.
 download/cache project and a comparison reference; it is not integrated here.
 See the [API and contribution comparison](docs/ecosystem.md). Ordinary resumable
 downloads, authentication and progress are shared capabilities, not novelty claims.
+
+Independently pinned block references also recover valid coverage when a file is
+already damaged and its local checkpoint is missing. See the
+[reproducible difference proof](docs/differentiation-proof.md).
+Portable [signed release authorization](docs/signed-releases.md) binds a pinned
+publisher key, product/channel, version and expiry to exact delta metadata.
+Run `moon run --deny-warn scripts/signed_update_demo.mbtx` for the signed update CLI.
+
+[Acceptance and local packaging](docs/acceptance.md) records reproduction commands;
+[validation history](docs/validation.md) distinguishes current evidence from older
+milestones. [Read-only previews](docs/update-preview.md) estimate reuse before writes.
+[Measured workloads](docs/stress-matrix.md), the [paired scanner experiment](docs/measurements/probe-comparison-20261026.md)
+and [process/storage fault tests](docs/fault-matrix.md) describe observations and
+their limits without claiming throughput superiority or power-loss safety.
 
 ## Implemented
 

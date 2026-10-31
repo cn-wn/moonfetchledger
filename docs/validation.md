@@ -25,6 +25,12 @@ An earlier incremental worker binary exited with SIGSEGV before its barrier;
 removing only its release build directory and rebuilding unchanged sources
 resolved that local failure. Fresh-checkout CI remains the cross-OS gate.
 
+Revision `6094b99` passed all five [CI jobs](https://github.com/cn-wn/moonfetchledger/actions/runs/41181569036):
+Linux/macOS/Windows complete verification, ordinary ext4 ENOSPC recovery and real
+WsgiDAV interoperability. Local source-package validation compared all 214
+packaged files, checked all four targets and ran the independent downstream
+application from an extracted archive. The real WsgiDAV flow also passed locally.
+
 ## Earlier control/batching baseline — `aa3cb90`
 
 Full-update control and checkpoint batching were verified using isolated official

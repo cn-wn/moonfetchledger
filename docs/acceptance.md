@@ -1,7 +1,7 @@
 # Reproducible delivery checklist
 
-This checkout is a library/tool delivery, not a Mooncakes publication. No script
-below logs in, uploads a package, pushes Git or sends a competition submission.
+This checklist verifies the library/tool delivery. No script below logs in,
+uploads a package, pushes Git or sends a competition submission.
 Third-party dependency installation is separate from publishing this module.
 
 ## Reproduce
@@ -20,8 +20,24 @@ moon run --deny-warn scripts/package_check.mbtx
 
 The first workflow checks formatting and generated-interface drift, strict
 four-target compilation, actual wasm/wasm-gc/JS/native tests and all bundled
-workflows including the independent downstream module. Core test counts at this
-milestone are 49 per portable target and 132 native, including WebDAV tests.
+workflows including the independent downstream module. The 2026-10-31 code
+preview-approval revision passed the following actual local tests:
+
+| Target | Passing tests | Coverage |
+| --- | ---: | --- |
+| Wasm | 51 | Portable core and release-policy packages |
+| Wasm-GC | 51 | Portable core and release-policy packages |
+| JavaScript | 51 | Portable core and release-policy packages |
+| Native (Linux) | 153 | Portable packages, host storage/HTTP and WebDAV integration |
+
+The [current code CI run](https://github.com/cn-wn/moonfetchledger/actions/runs/41181569036)
+for `6094b99` passed actual Linux, macOS and Windows execution, Linux source-package
+round-trip verification, ordinary ext4 ENOSPC recovery and a separate real WsgiDAV job. These are validation
+results for that revision, not fixed expected test counts for future changes.
+See [the current validation record](validation.md) for toolchain versions and
+dated historical results. Historical figures there belong to their original
+revisions.
+
 Examples invoke real child CLIs and local origins; they are assertions, not
 hard-coded success logs. Optional external-server verification remains separate:
 see [integration setup](../integration/README.md).
@@ -52,7 +68,12 @@ records reused APIs, test data and method references.
 
 Implemented: public-key-authenticated metadata, local monotonic version
 acceptance, one-to-32 seed reuse, bounded candidate work, private artifact auth,
-saved pause/resume, disk reconciliation and new-file verified export.
+full-update phase progress/cooperative cancellation, bounded checkpoint batching,
+single-scan preview approval, saved pause/resume, disk reconciliation and new-file
+verified export. A separate Linux gate tests actual ordinary-file ENOSPC at
+content/checkpoint/export boundaries and recovery in fresh processes. The
+[0.1.0 release notes](../CHANGELOG.md) summarize the initial release.
+
 Not implemented: automated trust bootstrap/rotation, TUF or `.zsync` compatibility,
 directory synchronization, shared chunk caching, installed-file replacement,
 malicious-filesystem protection or a general power-loss guarantee.
@@ -60,5 +81,5 @@ malicious-filesystem protection or a general power-loss guarantee.
 Only actual successful CI jobs establish Windows/macOS runtime results. Local
 Linux checks do not establish other operating-system support. Publishing,
 registry installation and competition acceptance must not be inferred from a
-successful local package round trip. This milestone intentionally does not
-publish to Mooncakes.
+successful local package round trip. Registry publication and installation
+are verified separately from these local source checks.
