@@ -15,8 +15,10 @@ The CLI permits local or remote metadata (the latter fetches metadata only), but
 preview forbids output/export, resume, chunk overrides and download controls.
 Local preview itself makes no network requests, state writes or sidecars. Existing
 seed locks are respected. A changed seed length fails; exclude unrelated writers.
-Reconstruction later rescans and verifies each selected block before copying;
-a preview does not authorize writing or guarantee a future file snapshot.
+Calling a separate reconstruction operation later rescans and verifies each
+selected block before copying. A standalone preview does not authorize writing
+or guarantee a future file snapshot. To decide and apply within one scan, use
+the callback workflow below.
 
 MFLPLAN1 is exactly `[tag, targetLength, scannedBytes, reusedBytes, downloadBytes,
 matches, gaps]`. All numbers are decimal strings. Each match is
@@ -49,9 +51,10 @@ O(target block count) selected matches, plus up to 32 file handles and locks.
 `[tag, targetLength, scannedBytes, reusedBytes, downloadBytes, perSeedBytes,
 matches, gaps]`; a match is `[seedIndex, sourceStart, sourceEnd, targetStart,
 targetEnd]`. Numbers are decimal strings. These plans are advisory and not a
-persisted authorization format. Reconstruction rescans/rechecks selected bytes.
+persisted authorization format. A separate reconstruction rescans; all
+reconstruction paths recheck selected bytes.
 
-All seed handles and cooperative shared locks remain held during staging.
+All seed handles and any existing cooperative shared locks remain held during staging.
 Invalid/missing/duplicate canonical paths and all seed/session-to-output aliases
 are refused; no seed is silently skipped. Owned partial staging is retained on
 I/O failure for normal receiver recovery. Same-size external changes still
@@ -106,3 +109,53 @@ budgets, repeated deliberate weak collisions, arbitrary read boundaries, exact
 suffix recovery, shared pool budgets and failure-before-staging followed by a
 larger-budget retry. The multi-seed CLI demo checks both limit failures, then
 performs verified delivery under explicit limits.
+
+## Decide and apply without a second rolling scan
+
+Initial `reuse_from_seed(s)`, `update_from_seed(s)` and `update_signed_release`
+accept `on_preview : async (SeedPoolPlan) -> Bool`. The callback runs exactly
+once after the union scan, before staging/output lock/checkpoint creation. It
+can display the plan, await a UI decision or enforce a logical download limit:
+
+```mbt nocheck
+let result = @host.update_from_seeds(reference, old_files, staging,
+  export_to=ready, on_preview=plan => {
+    println(plan.to_json().stringify())
+    plan.download_bytes() <= 10000000L
+  })
+```
+
+Returning `false` raises `HostError::PreviewDeclined`; observer errors propagate.
+Neither creates a new staging session. Approval applies the **same in-memory
+plan**, with the same open seed handles and any existing cooperative locks.
+There is no second rolling scan or candidate-budget charge. Copy-time SHA-256,
+sync/readback and final whole-file verification still run. No persisted plan is
+trusted. Accessor arrays are copies and cannot alter the plan being applied.
+
+After the decision, a pending cancellation or changed seed length refuses before
+staging; newly occupied target paths are preserved. Same-size content changes
+are caught by selected-block SHA-256 verification, retaining only saved verified
+coverage for ordinary recovery. Callers must still exclude unrelated writers;
+this does not create a filesystem snapshot or protect against malicious paths.
+Do not request exclusive access to a cooperative seed lock from inside the
+callback while this operation holds its shared lock.
+
+Resume performs no seed scan and rejects this option. In signed updates the
+authenticated version is accepted **before** the scan/decision: declining does
+not roll back the persistent version floor. Retry the same valid release.
+
+Both update CLIs accept `--plan-before-update` on initial updates. This prints
+one MFLPOOL1 record and then continues using that scan result; it automatically
+approves and is not an interactive confirmation prompt. CLI applications that
+need approval should use the callback API. `--preview` remains read-only.
+
+```text
+moon run --target native examples/preview-update
+moon run --target native cmd/update -- --metadata v2.delta --metadata-sha256 TRUSTED_PIN --seed v1.bin --output staging --export-to ready --plan-before-update
+moon run --deny-warn scripts/delta_update_demo.mbtx
+moon run --deny-warn scripts/signed_update_demo.mbtx
+```
+
+The real-data example combines two incomplete USGS files with a single scan,
+approves before staging and delivers exact bytes with zero artifact GETs. Both
+child-process CLI workflows assert one plan record and no later scanning phase.

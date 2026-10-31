@@ -1,5 +1,32 @@
 # Validation record — 2026-10-31
 
+## Preview approval and ordinary filesystem recovery
+
+Official stable Linux moon/moonrun 0.1.20261028 and moonc
+v0.10.18+6c83a7f62 passed strict four-target checking, 51 actual tests on each
+portable target and 153 actual native tests. Six new tests cover one-plan
+approval, decline/observer errors before staging, cancellation, changed seed
+length/content, occupied destinations, and signed version-floor retention/retry.
+Existing callers without a preview callback continue through the same engine.
+
+The Linux ext4 integration gate produced actual errno 28 at ordinary content,
+checkpoint and export writes. After freeing only an owned filler file, three
+fresh worker processes retained 0/4096/28008 bytes and read 7/6/0 blocks, then
+delivered exact USGS bytes and SHA-256. The private 16 MiB images were unmounted
+and removed. This is bounded ENOSPC evidence, not power-loss validation.
+Commands and precise limits: [preview workflow](update-preview.md) and
+[filesystem fault matrix](fault-matrix.md).
+Both actual-process update CLIs also passed the plan-before-update workflow:
+exactly one MFLPOOL1 report, no scanning progress after that report, preserved
+inputs and exact offline delivery from local seeds. This supplements the library
+tests; the older read-only-preview and pause/resume workflows remain exercised.
+The existing six-row Linux fault matrix passed after a clean release rebuild.
+An earlier incremental worker binary exited with SIGSEGV before its barrier;
+removing only its release build directory and rebuilding unchanged sources
+resolved that local failure. Fresh-checkout CI remains the cross-OS gate.
+
+## Earlier control/batching baseline — `aa3cb90`
+
 Full-update control and checkpoint batching were verified using isolated official
 Linux moon/moonrun 0.1.20261028 and moonc v0.10.18+6c83a7f62; all three binary
 hashes matched the official latest SHA-256 list. After clearing the older

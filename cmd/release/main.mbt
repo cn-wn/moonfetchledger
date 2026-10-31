@@ -98,6 +98,9 @@ async fn run() -> Unit {
     }
     if flag == "--help" {
       println(
+        "--plan-before-update prints MFLPOOL1 and reuses the same scan plan after signed acceptance; initial updates only.",
+      )
+      println(
         "--progress-json emits phase progress. --cancel-file PATH cooperatively pauses when that marker exists; remove the marker before retry/resume. Existing accepted release versions are retained.",
       )
       println(
@@ -120,9 +123,9 @@ async fn run() -> Unit {
       )
       return
     }
-    if flag == "--progress-json" {
+    if flag == "--progress-json" || flag == "--plan-before-update" {
       if values.contains(flag) {
-        fail("duplicate --progress-json")
+        fail("duplicate option: \{flag}")
       }
       values[flag] = "true"
       continue i + 1
@@ -185,7 +188,7 @@ async fn run() -> Unit {
       "--release", "--release-url", "--seed", "--output", "--metadata", "--export-to",
       "--parallel", "--stop-after-blocks", "--max-attempts", "--request-timeout-ms",
       "--bearer-env", "--artifact-url", "--max-scan-bytes", "--max-hash-bytes", "--checkpoint-blocks",
-      "--cancel-file", "--progress-json",
+      "--cancel-file", "--progress-json", "--plan-before-update",
     ]
   }
   for key in values.keys() {
@@ -244,6 +247,9 @@ async fn run() -> Unit {
   }
   if resuming && (max_scan_bytes is Some(_) || max_hash_bytes is Some(_)) {
     fail("scan limits are only for initial updates; omit them on resume")
+  }
+  if resuming && values.contains("--plan-before-update") {
+    fail("--plan-before-update is only for initial updates; omit it on resume")
   }
   if timeout < 1 ||
     timeout > 120000 ||
@@ -307,6 +313,7 @@ async fn run() -> Unit {
     max_hash_bytes?,
     checkpoint_blocks~,
     control?,
+    on_preview?=command_preview(values),
   )
   report(if result.update.receive.complete { "complete" } else { "paused" }, [
     result.version.to_string(),
@@ -316,6 +323,20 @@ async fn run() -> Unit {
   ])
   if result.update.exported {
     report("exported", [result.version.to_string()])
+  }
+}
+
+///|
+fn command_preview(
+  values : Map[String, String],
+) -> (async (@ledger.SeedPoolPlan) -> Bool)? {
+  if values.contains("--plan-before-update") {
+    Some(plan => {
+      println(plan.to_json().stringify())
+      true
+    })
+  } else {
+    None
   }
 }
 

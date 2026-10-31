@@ -229,12 +229,18 @@ pub async fn update_from_seed(
   max_hash_bytes? : Int64,
   checkpoint_blocks~ : Int32 = 1,
   control? : UpdateControl,
+  on_preview? : async (@ledger.SeedPoolPlan) -> Bool,
 ) -> DeltaUpdateReport {
   check_checkpoint_blocks(checkpoint_blocks)
   check_scan_limits(max_scan_bytes?, max_hash_bytes?)
-  if resuming && (max_scan_bytes is Some(_) || max_hash_bytes is Some(_)) {
+  if resuming &&
+    (
+      max_scan_bytes is Some(_) ||
+      max_hash_bytes is Some(_) ||
+      on_preview is Some(_)
+    ) {
     raise InvalidInput(
-      "scan limits apply only to initial seed reuse; omit them on resume",
+      "scan limits and preview decisions apply only to initial seed reuse; omit them on resume",
     )
   }
   check_delta_update(
@@ -260,6 +266,7 @@ pub async fn update_from_seed(
           max_hash_bytes?,
           checkpoint_blocks~,
           control?,
+          on_preview?,
         ),
       )
     None => None
@@ -342,6 +349,7 @@ pub async fn update_from_seeds(
   max_hash_bytes? : Int64,
   checkpoint_blocks~ : Int32 = 1,
   control? : UpdateControl,
+  on_preview? : async (@ledger.SeedPoolPlan) -> Bool,
 ) -> DeltaUpdateReport {
   check_checkpoint_blocks(checkpoint_blocks)
   check_scan_limits(max_scan_bytes?, max_hash_bytes?)
@@ -367,6 +375,7 @@ pub async fn update_from_seeds(
     max_hash_bytes?,
     checkpoint_blocks~,
     control?,
+    on_preview?,
   )
   finish_delta_update(
     reference,

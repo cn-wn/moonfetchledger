@@ -155,6 +155,7 @@ pub async fn update_signed_release(
   max_hash_bytes? : Int64,
   checkpoint_blocks~ : Int32 = 1,
   control? : UpdateControl,
+  on_preview? : async (@ledger.SeedPoolPlan) -> Bool,
 ) -> SignedUpdateReport {
   check_checkpoint_blocks(checkpoint_blocks)
   check_scan_limits(max_scan_bytes?, max_hash_bytes?)
@@ -171,12 +172,13 @@ pub async fn update_signed_release(
         seed is Some(_) ||
         seeds is Some(_) ||
         max_scan_bytes is Some(_) ||
-        max_hash_bytes is Some(_)
+        max_hash_bytes is Some(_) ||
+        on_preview is Some(_)
       )
     ) ||
     (!resuming && (sources.is_empty() || sources.length() > 32)) {
     raise InvalidInput(
-      "initial signed update requires 1..32 seeds; resume accepts no seeds or scan limits",
+      "initial signed update requires 1..32 seeds; resume accepts no seeds, scan limits or preview decision",
     )
   }
   let source_entries : Array[String] = []
@@ -309,6 +311,7 @@ pub async fn update_signed_release(
         max_hash_bytes?,
         checkpoint_blocks~,
         control?,
+        on_preview?,
       )
     }
     {

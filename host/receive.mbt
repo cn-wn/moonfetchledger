@@ -6,6 +6,7 @@ pub suberror HostError {
   OutputLocked
   RetryExhausted(@ledger.ByteRange, Int32, String)
   UpdatePaused(UpdatePhase, Bool)
+  PreviewDeclined
 } derive(Debug)
 
 ///|

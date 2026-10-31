@@ -107,6 +107,8 @@ pub async fn preview_seeds(
 /// Hold all cooperative seed locks/handles through copying; strong-recheck every
 /// chosen block, sync/read back and checkpoint it. Existing inputs are never
 /// silently skipped. Missing blocks use ordinary receive_from/download/WebDAV.
+/// `on_preview` decides once before staging and applies the same scan plan.
+/// False raises PreviewDeclined; errors propagate. Copy-time hashes still apply.
 pub async fn reuse_from_seeds(
   reference : @ledger.DeltaReference,
   seeds : Array[String],
@@ -115,6 +117,7 @@ pub async fn reuse_from_seeds(
   max_hash_bytes? : Int64,
   checkpoint_blocks~ : Int32 = 1,
   control? : UpdateControl,
+  on_preview? : async (@ledger.SeedPoolPlan) -> Bool,
 ) -> SeedReuseReport {
   check_checkpoint_blocks(checkpoint_blocks)
   check_scan_limits(max_scan_bytes?, max_hash_bytes?)
@@ -149,6 +152,27 @@ pub async fn reuse_from_seeds(
       max_hash_bytes?,
       control?,
     )
+    // Keep the same cooperative locks and handles from scan through decision
+    // and reconstruction. Approval reuses this plan; selected content is still
+    // strongly rechecked by prepare_reuse before each write.
+    if on_preview is Some(decide) && !decide(plan) {
+      raise PreviewDeclined
+    }
+    update_pause(control, Scanning, false)
+    for i, file in files {
+      if file.size() != sizes[i] {
+        raise InvalidInput(
+          "seed changed length during preview; retry a fresh scan before staging",
+        )
+      }
+    }
+    for suffix in ["", ".mfl", ".mfl.lock", ".mfl.next", ".mfl.recovering"] {
+      if @fs.exists(output + suffix) {
+        raise InvalidInput(
+          "target appeared during preview; preserve it and choose a new session",
+        )
+      }
+    }
     let lock = @fs.open(
       output + ".mfl.lock",
       mode=ReadWrite,

@@ -421,8 +421,26 @@ async fn main {
     assert_eq(@fs.read_file(controlled_state).binary(), original_state)
     assert_true(@fs.exists(marker) && !@fs.exists(dir + "/controlled"))
     @fs.remove(marker)
+    controlled.push("--plan-before-update")
     let controlled_done = invoke("release", controlled)
     controlled_done.check()
+    assert_eq(
+      controlled_done
+      .stdout()
+      .split("\n")
+      .filter(line => line.contains("\"MFLPOOL1\""))
+      .count(),
+      1,
+    )
+    let mut approved_plan = false
+    for line in controlled_done.stdout().split("\n") {
+      if line.contains("\"MFLPOOL1\"") {
+        approved_plan = true
+      }
+      if approved_plan {
+        assert_true(!line.contains("\"scanning\""))
+      }
+    }
     assert_true(controlled_done.stdout().contains("\"finished\",\"running\""))
     assert_eq(@fs.read_file(dir + "/controlled-ready").binary(), v2)
     let pending = @fs.read_file(state).binary()

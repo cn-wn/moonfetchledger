@@ -42,6 +42,9 @@ async fn run() -> Unit {
     }
     if flag == "--help" {
       println(
+        "--plan-before-update prints MFLPOOL1 and reuses the same scan plan; initial updates only.",
+      )
+      println(
         "--progress-json emits phase progress. --cancel-file PATH cooperatively pauses when that marker exists; retain it until the pause completes, then remove it before retry/resume.",
       )
       println(
@@ -61,9 +64,9 @@ async fn run() -> Unit {
       )
       return
     }
-    if flag == "--progress-json" {
+    if flag == "--progress-json" || flag == "--plan-before-update" {
       if values.contains(flag) {
-        fail("duplicate --progress-json")
+        fail("duplicate option: \{flag}")
       }
       values[flag] = "true"
       continue i + 1
@@ -180,6 +183,9 @@ async fn run() -> Unit {
   if resuming && (max_scan_bytes is Some(_) || max_hash_bytes is Some(_)) {
     fail("scan limits are only for initial seed scans; omit them on resume")
   }
+  if resuming && values.contains("--plan-before-update") {
+    fail("--plan-before-update is only for initial updates; omit it on resume")
+  }
   let timeout = small(values, "--request-timeout-ms", 30000)
   let checkpoint_blocks = small(values, "--checkpoint-blocks", 1)
   if checkpoint_blocks < 1 || checkpoint_blocks > 1024 {
@@ -248,6 +254,7 @@ async fn run() -> Unit {
       max_hash_bytes?,
       checkpoint_blocks~,
       control?,
+      on_preview?=command_preview(values),
     )
   } else {
     @host.update_from_seed(
@@ -264,6 +271,7 @@ async fn run() -> Unit {
       max_hash_bytes?,
       checkpoint_blocks~,
       control?,
+      on_preview?=command_preview(values),
     )
   }
   if report.seed is Some(seed) {
@@ -294,6 +302,20 @@ async fn run() -> Unit {
         Json::string(reference.spec.sha256),
       ]).stringify(),
     )
+  }
+}
+
+///|
+fn command_preview(
+  values : Map[String, String],
+) -> (async (@ledger.SeedPoolPlan) -> Bool)? {
+  if values.contains("--plan-before-update") {
+    Some(plan => {
+      println(plan.to_json().stringify())
+      true
+    })
+  } else {
+    None
   }
 }
 

@@ -379,8 +379,26 @@ async fn main {
     assert_true(@fs.exists(marker) && !@fs.exists(controlled_output))
     assert_true(!@fs.exists(controlled_output + ".mfl.lock"))
     @fs.remove(marker)
+    controlled.push("--plan-before-update")
     let delivered = invoke(controlled)
     delivered.check()
+    assert_eq(
+      records(delivered.stdout())
+      .filter(p => p is [String("MFLPOOL1"), ..])
+      .length(),
+      1,
+    )
+    let mut approved_plan = false
+    for record in records(delivered.stdout()) {
+      if record is [String("MFLPOOL1"), ..] {
+        approved_plan = true
+      }
+      if approved_plan {
+        assert_true(
+          !(record is [String("MFLUPDATEPROGRESS1"), String("scanning"), ..]),
+        )
+      }
+    }
     assert_true(
       records(delivered.stdout()).any(p => {
         p

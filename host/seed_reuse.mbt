@@ -102,6 +102,7 @@ pub async fn reuse_from_seed(
   max_hash_bytes? : Int64,
   checkpoint_blocks~ : Int32 = 1,
   control? : UpdateControl,
+  on_preview? : async (@ledger.SeedPoolPlan) -> Bool,
 ) -> SeedReuseReport {
   reuse_from_seeds(
     reference,
@@ -111,5 +112,6 @@ pub async fn reuse_from_seed(
     max_hash_bytes?,
     checkpoint_blocks~,
     control?,
+    on_preview?,
   )
 }

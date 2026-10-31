@@ -49,6 +49,7 @@ async fn main {
     "scripts/delta_update_demo.mbtx", "scripts/signed_update_demo.mbtx", "scripts/seed_pool_demo.mbtx",
     "scripts/downstream_demo.mbtx", "integration/downstream/main.mbt", "scripts/package_check.mbtx",
     "scripts/stress_matrix.mbtx", "scripts/fault_matrix.mbtx", "scripts/compare_scanners.mbtx",
+    "scripts/filesystem_faults.mbtx",
   ])
   checked(["info"])
   checked(["info", "--target", "native"])
@@ -74,6 +75,7 @@ async fn main {
   checked(["run", "--target", "native", "examples/delta"])
   checked(["run", "--target", "native", "examples/batched"])
   checked(["run", "--target", "native", "examples/update-control"])
+  checked(["run", "--target", "native", "examples/preview-update"])
   checked(["run", "scripts/auth_demo.mbtx"])
   checked(["run", "scripts/manifest_demo.mbtx"])
   checked(["run", "scripts/checkpoint_recovery_demo.mbtx"])
